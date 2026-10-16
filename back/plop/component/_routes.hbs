@@ -1,0 +1,17 @@
+import { Router } from "express";
+import { {{pascalCase name}}Controller } from "#src/controllers";
+{{#if useAuth}}
+import { verifyJWT } from "#src/middlewares";
+{{/if}}
+
+const {{pascalCase name}}Router = Router();
+const { create, findAll, findById, update, deleteById } = {{pascalCase name}}Controller();
+
+{{pascalCase name}}Router.get("/", {{#if useAuth}}verifyJWT, {{/if}}findAll);
+{{pascalCase name}}Router.get("/:id", {{#if useAuth}}verifyJWT, {{/if}}findById);
+{{pascalCase name}}Router.post("/", {{#if useAuth}}verifyJWT, {{/if}}create);
+{{pascalCase name}}Router.put("/:id", {{#if useAuth}}verifyJWT, {{/if}}update);
+{{pascalCase name}}Router.delete("/:id", {{#if useAuth}}verifyJWT, {{/if}}deleteById);
+
+export { {{pascalCase name}}Router };
+export default {{pascalCase name}}Router;

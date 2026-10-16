@@ -1,0 +1,95 @@
+import { prisma } from "#src/services/index.js";
+
+const {{pascalCase name}}Controller = () => {
+  async function create(req, res, next) {
+    try {
+      const data = await prisma.{{camelCase model}}.create({
+        data: req.body,
+      });
+
+      return res.status(201).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async function findAll(req, res, next) {
+    try {
+      const data = await prisma.{{camelCase model}}.findMany();
+
+      return res.status(200).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async function findById(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+
+      const data = await prisma.{{camelCase model}}.findUnique({
+        where: { id },
+      });
+
+      if (!data) {
+        return res.status(404).json({ error: "{{pascalCase name}} não encontrado" });
+      }
+
+      return res.status(200).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async function update(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+
+      const data = await prisma.{{camelCase model}}.update({
+        where: { id },
+        data: req.body,
+      });
+
+      return res.status(200).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async function deleteById(req, res, next) {
+    try {
+      const id = Number(req.params.id);
+
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+
+      await prisma.{{camelCase model}}.delete({
+        where: { id },
+      });
+
+      return res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  return {
+    create,
+    findAll,
+    findById,
+    update,
+    deleteById,
+  };
+};
+
+export { {{pascalCase name}}Controller };
+export default {{pascalCase name}}Controller;
