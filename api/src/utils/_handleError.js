@@ -1,6 +1,12 @@
+import { ZodError } from "zod";
+
 function handleError(error, req, res, next) {
 	console.error(`[${new Date().toISOString()}] Erro em ${req.method} ${req.originalUrl}`);
 	console.error(error);
+
+	if (error instanceof ZodError) {
+		return res.status(400).json({ error: describeZodError(error) });
+	}
 
 	// Prisma — erros conhecidos (foreign key, unique constraint, etc.)
 	if (error.code?.startsWith("P")) {
@@ -11,6 +17,13 @@ function handleError(error, req, res, next) {
 	return res.status(error.status || 500).json({
 		error: error.status ? error.message : "Erro interno do servidor",
 	});
+}
+
+// Mostra só o primeiro problema, com o campo de origem ("status", e não "status.1" de um item da lista).
+function describeZodError(error) {
+	const [issue] = error.issues;
+	const field = issue.path.filter((part) => typeof part === "string").join(".");
+	return field ? `"${field}": ${issue.message}` : issue.message;
 }
 
 function handlePrismaError(error, res) {

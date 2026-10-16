@@ -1,7 +1,7 @@
 import express from "express";
 import { handleError } from "#src/utils"
 import { settings } from "#src/config";
-import { UsageRouter } from "#src/routes";
+import { UsageRouter, LeadRouter } from "#src/routes";
 import cors from "cors";
 
 const app = express();
@@ -14,6 +14,7 @@ app.get("/", (req, res) => {
   res.json("Servidor rodando");
 });
 app.use("/usage", UsageRouter);
+app.use("/leads", LeadRouter);
 app.use(handleError);
 
 // Só aceita conexões da própria máquina: quem estiver na mesma rede não consegue gastar as requisições.
