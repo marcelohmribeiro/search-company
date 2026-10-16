@@ -1,28 +1,19 @@
-import axios, { type InternalAxiosRequestConfig, type AxiosError } from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { settings } from 'src/config'
-import useAuthStore from 'src/store/authStore'
 
 const { API_URL } = settings
 const api = axios.create({ baseURL: API_URL })
 
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const { token } = useAuthStore.getState()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
-api.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    if (error?.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
+/**
+ * Mensagem de erro para exibir ao usuário: a do backend (`{ error }`) quando existir.
+ */
+function getErrorMessage(error: unknown): string {
+	if (isAxiosError(error)) {
+		if (error.response?.data?.error) return error.response.data.error
+		if (!error.response) return `Não foi possível falar com o backend em ${API_URL}.`
+	}
+	return error instanceof Error ? error.message : 'Erro inesperado.'
+}
 
 export default api
-export { api }
+export { api, getErrorMessage }

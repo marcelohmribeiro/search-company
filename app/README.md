@@ -1,6 +1,6 @@
-# Games Platform — Web
+# Search Company — Web
 
-React 19 + Vite + Tailwind CSS v4 + React Router 7.
+React 19 + Vite + Tailwind CSS v4 + React Router 7. Telas de busca de empresas e de acompanhamento de leads; o backend fica em `../api`.
 
 ## Scripts
 
@@ -15,23 +15,22 @@ bun run lint
 
 Copie `.env.example` para `.env`:
 
-- `VITE_APP_NAME` — nome do app (também usado como chave de persistência do auth no localStorage)
-- `VITE_API_URL` — URL base da API
+- `VITE_APP_NAME` — nome do app
+- `VITE_API_URL` — URL do backend (`http://localhost:3333`)
 
 ## Estrutura
 
 ```
 src/
-├── components/        # componentes compartilhados
+├── components/        # componentes compartilhados (badges, modal do lead)
 ├── config/            # settings a partir das env vars
-├── constants/
+├── constants/         # rótulos em português dos enums
 ├── css/               # entrada do Tailwind
 ├── hooks/
-├── lib/
-├── pages/             # páginas e layouts (index.tsx / layout.tsx por pasta)
+├── lib/               # helpers (telefone/WhatsApp)
+├── pages/             # index.tsx (Busca), leads/ e layout.tsx
 ├── routes/            # createBrowserRouter
-├── services/          # _api.ts (axios + interceptors) e serviços por recurso
-├── store/             # stores zustand
-│   └── helpers/       # loading.ts (contador global de loading)
+├── services/          # _api.ts (axios) e serviços por recurso
+├── store/             # stores zustand (uso do mês)
 └── types/
 ```
