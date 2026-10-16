@@ -5,5 +5,139 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["schema-name"]
+}
+
+enum SiteStatus {
+  NO_WEBSITE
+  INSTAGRAM_ONLY
+  WHATSAPP_ONLY
+  FACEBOOK_ONLY
+  LINK_AGGREGATOR
+  HAS_WEBSITE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  CLOSED
+  DISCARDED
+}
+
+enum SearchStatus {
+  RUNNING
+  DONE
+  LIMIT_REACHED
+  FAILED
+}
+
+enum ApiRequestStatus {
+  PENDING
+  SUCCESS
+  ERROR
+}
+
+/// Uma linha por chamada HTTP à Places API. A contagem por `period` é o uso do mês.
+model ApiRequest {
+  id           Int              @id @default(autoincrement())
+  /// Mês de cobrança do Google no fuso America/Los_Angeles, no formato "2026-10".
+  period       String
+  page         Int
+  status       ApiRequestStatus @default(PENDING)
+  httpStatus   Int?
+  resultsCount Int?
+  error        String?
+  /// Corpo da resposta do Google como veio (`places` e `nextPageToken`, ou o erro). `null` quando não houve resposta.
+  response     Json?
+  createdAt    DateTime         @default(now())
+  finishedAt   DateTime?
+  searchId     Int?
+  search       Search?          @relation(fields: [searchId], references: [id])
+
+  @@index([period])
+}
+
+model Search {
+  id            Int          @id @default(autoincrement())
+  city          String
+  category      String
+  neighborhood  String?
+  textQuery     String
+  maxPages      Int
+  pagesFetched  Int          @default(0)
+  resultsCount  Int          @default(0)
+  newLeadsCount Int          @default(0)
+  /// Verdadeiro quando a última página veio sem `nextPageToken`.
+  exhausted     Boolean      @default(false)
+  status        SearchStatus @default(RUNNING)
+  error         String?
+  createdAt     DateTime     @default(now())
+  finishedAt    DateTime?
+  requests      ApiRequest[]
+  leads         Lead[]
+  results       SearchLead[]
+
+  @@index([textQuery])
+}
+
+model Lead {
+  /// `places.id` do Google.
+  id                 String       @id
+  name               String
+  address            String?
+  /// Bairro informado pelo Google em `addressComponents`.
+  neighborhood       String?
+  city               String
+  /// Sigla do estado ("CE"), vinda de `addressComponents` (administrative_area_level_1).
+  state              String?
+  /// Categoria da busca que encontrou a empresa pela primeira vez.
+  category           String
+  /// Bairro da busca que encontrou a empresa pela primeira vez.
+  searchNeighborhood String?
+  primaryType        String?
+  primaryTypeName    String?
+  nationalPhone      String?
+  internationalPhone String?
+  websiteUri         String?
+  siteStatus         SiteStatus
+  rating             Float?
+  userRatingCount    Int?
+  googleMapsUri      String?
+  businessStatus     String?
+  types              String[]     @default([])
+  /// Atende os clientes no local deles e não tem endereço físico no Maps.
+  pureServiceArea    Boolean?
+  /// `regularOpeningHours.weekdayDescriptions`, um texto por dia da semana.
+  openingHours       String[]     @default([])
+  priceLevel         String?
+  reviewsUri         String?
+  photosUri          String?
+  /// Objeto Place completo devolvido pela Text Search, com todos os campos do field mask.
+  googleData         Json?
+  status             LeadStatus   @default(NEW)
+  notes              String?
+  firstSeenAt        DateTime     @default(now())
+  lastSeenAt         DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  firstSearchId      Int?
+  firstSearch        Search?      @relation(fields: [firstSearchId], references: [id])
+  searchResults      SearchLead[]
+
+  @@index([siteStatus])
+  @@index([status])
+  @@index([city, category])
+}
+
+/// Empresas que cada busca trouxe. Um lead aparece aqui uma vez por busca que o encontrou.
+model SearchLead {
+  searchId  Int
+  leadId    String
+  page      Int
+  createdAt DateTime @default(now())
+  search    Search   @relation(fields: [searchId], references: [id])
+  lead      Lead     @relation(fields: [leadId], references: [id])
+
+  @@id([searchId, leadId])
+  @@index([leadId])
+  @@index([createdAt])
 }
