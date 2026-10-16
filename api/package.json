@@ -5,8 +5,10 @@
     "#src/*": "./src/*/index.js"
   },
   "scripts": {
+    "migrate": "prisma migrate dev",
     "generate": "plop",
     "postinstall": "prisma generate",
+    "dev": "node --watch server.js",
     "start": "node server.js"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ app.get("/", (req, res) => {
 });
 app.use(handleError);
 
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta http://localhost:${port}`);
+// Só aceita conexões da própria máquina: quem estiver na mesma rede não consegue gastar as requisições.
+app.listen(port, settings.HOST, () => {
+  console.log(`Servidor rodando em http://localhost:${port}`);
 });
