@@ -6,6 +6,7 @@
   },
   "scripts": {
     "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
     "generate": "plop",
     "postinstall": "prisma generate",
     "dev": "node --watch server.js",
