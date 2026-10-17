@@ -5,18 +5,16 @@ import { httpError } from "#src/utils";
 // Chave arbitrária do advisory lock que serializa as reservas de requisição no Postgres.
 const RESERVATION_LOCK_KEY = 990001;
 
+// A cota grátis do Google reinicia à meia-noite do dia 1 no horário do Pacífico.
 const periodFormatter = new Intl.DateTimeFormat("en-CA", {
-	timeZone: settings.BILLING_TIME_ZONE,
+	timeZone: "America/Los_Angeles",
 	year: "numeric",
 	month: "2-digit",
 });
 
-/**
- * Mês de cobrança do Google que contém `date`, no formato "2026-10".
- * @param {Date} [date]
- */
-function currentPeriod(date = new Date()) {
-	return periodFormatter.format(date);
+/** Mês de cobrança do Google em que estamos, no formato "2026-10". */
+function currentPeriod() {
+	return periodFormatter.format(new Date());
 }
 
 /**
@@ -64,4 +62,4 @@ async function finishRequest(id, { status, httpStatus, resultsCount, error, resp
 	});
 }
 
-export { currentPeriod, getUsage, reserveRequest, finishRequest };
+export { getUsage, reserveRequest, finishRequest };

@@ -131,10 +131,44 @@ async function findCompletedSearch(textQuery, maxPages) {
 }
 
 /**
+ * Pede uma página à Text Search e registra a requisição no contador do mês: a linha é criada antes da
+ * chamada e recebe o resultado depois, inclusive quando a chamada falha.
+ * @returns {Promise<{ places: object[], nextPageToken?: string }>}
+ * @throws Erro 429 com o limite do mês atingido, sem chamar o Google. Erro 502 com a mensagem do Google ou
+ * da rede quando a chamada falha; nesse caso, a requisição já conta no mês.
+ */
+async function fetchPage({ searchId, page, textQuery, pageToken, apiKey }) {
+	await waitForRateLimit();
+	const request = await reserveRequest({ searchId, page });
+
+	let result;
+	try {
+		result = await searchText({ textQuery, pageToken, apiKey });
+	} catch (fetchError) {
+		await finishRequest(request.id, { status: "ERROR", error: fetchError.message });
+		throw httpError(502, `Falha ao chamar a Places API: ${fetchError.message}`);
+	}
+
+	if (!result.ok) {
+		const error = describeGoogleError(result);
+		await finishRequest(request.id, { status: "ERROR", httpStatus: result.status, error, response: result.body });
+		throw httpError(502, error);
+	}
+
+	const places = result.body?.places ?? [];
+	await finishRequest(request.id, {
+		status: "SUCCESS",
+		httpStatus: result.status,
+		resultsCount: places.length,
+		response: result.body,
+	});
+	return { places, nextPageToken: result.body?.nextPageToken };
+}
+
+/**
  * Roda uma busca (uma combinação categoria × bairro × cidade) na Places API, página por página,
- * e grava os leads de cada página no banco. Cada página reserva uma requisição no limite
- * mensal antes de ser enviada, e a busca para no limite, no primeiro erro ou quando não há próxima página.
- * Não há nova tentativa.
+ * e grava os leads de cada página no banco. A busca para no limite do mês, no primeiro erro ou quando
+ * não há próxima página. Não há nova tentativa.
  * @param {{ city: string, category: string, neighborhood?: string, maxPages: number, skipIfDone: boolean }} input
  * @param {string} apiKey Chave da API do Google enviada pelo cliente. Só é repassada ao Google: não vai para o
  * banco nem para o log.
@@ -161,68 +195,33 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 			throw httpError(429, `Limite de ${usage.limit} requisições do mês ${usage.period} atingido.`);
 		}
 
-		let search = await prisma.search.create({
+		const search = await prisma.search.create({
 			data: { city, category, neighborhood, textQuery, maxPages },
 		});
 
-		let pageToken;
+		const totals = { pagesFetched: 0, resultsCount: 0, newLeadsCount: 0 };
 		let status = "DONE";
 		let error = null;
-		const totals = { pagesFetched: 0, resultsCount: 0, newLeadsCount: 0 };
+		let pageToken;
 
 		try {
 			for (let page = 1; page <= maxPages; page++) {
-				await waitForRateLimit();
-
-				let request;
-				try {
-					request = await reserveRequest({ searchId: search.id, page });
-				} catch (reserveError) {
-					if (reserveError.status !== 429) throw reserveError;
-					status = "LIMIT_REACHED";
-					error = reserveError.message;
-					break;
-				}
-
-				let result;
-				try {
-					result = await searchText({ textQuery, pageToken, apiKey });
-				} catch (fetchError) {
-					await finishRequest(request.id, { status: "ERROR", error: fetchError.message });
-					status = "FAILED";
-					error = `Falha ao chamar a Places API: ${fetchError.message}`;
-					break;
-				}
-
-				if (!result.ok) {
-					error = describeGoogleError(result);
-					await finishRequest(request.id, { status: "ERROR", httpStatus: result.status, error, response: result.body });
-					status = "FAILED";
-					break;
-				}
-
-				const places = result.body?.places ?? [];
-				await finishRequest(request.id, {
-					status: "SUCCESS",
-					httpStatus: result.status,
-					resultsCount: places.length,
-					response: result.body,
-				});
-
+				const { places, nextPageToken } = await fetchPage({ searchId: search.id, page, textQuery, pageToken, apiKey });
 				totals.pagesFetched++;
 				totals.resultsCount += places.length;
 				totals.newLeadsCount += await saveLeads(places, search, page);
 
-				pageToken = result.body?.nextPageToken;
+				pageToken = nextPageToken;
 				if (!pageToken) break;
 			}
-		} catch (unexpectedError) {
-			console.error(unexpectedError);
-			status = "FAILED";
-			error = unexpectedError.message;
+		} catch (stop) {
+			// Limite (429) e falha do Google (502) ficam registrados na busca; o resto é inesperado.
+			if (!stop.status) console.error(stop);
+			status = stop.status === 429 ? "LIMIT_REACHED" : "FAILED";
+			error = stop.message;
 		}
 
-		search = await prisma.search.update({
+		const finished = await prisma.search.update({
 			where: { id: search.id },
 			data: {
 				...totals,
@@ -233,7 +232,7 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 			},
 		});
 
-		return { skipped: false, search, usage: await getUsage() };
+		return { skipped: false, search: finished, usage: await getUsage() };
 	} finally {
 		searchRunning = false;
 	}
@@ -247,4 +246,4 @@ async function listSearches(take = 100) {
 	return prisma.search.findMany({ orderBy: { createdAt: "desc" }, take });
 }
 
-export { buildTextQuery, runSearch, listSearches };
+export { runSearch, listSearches };

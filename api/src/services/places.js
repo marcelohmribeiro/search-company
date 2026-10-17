@@ -97,4 +97,4 @@ async function searchText({ textQuery, pageToken, apiKey }) {
 	return { ok: response.ok, status: response.status, body };
 }
 
-export { FIELD_MASK, searchText };
+export { searchText };

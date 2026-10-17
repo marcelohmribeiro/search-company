@@ -16,8 +16,6 @@ const JWT_SECRET = process.env.JWT_SECRET
 const PLACES_API_URL = process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText"
 const MONTHLY_REQUEST_LIMIT = Math.min(readNumber(process.env.MONTHLY_REQUEST_LIMIT, HARD_REQUEST_LIMIT), HARD_REQUEST_LIMIT)
 const REQUESTS_PER_MINUTE = readNumber(process.env.REQUESTS_PER_MINUTE, 10)
-// A cota grátis do Google reinicia à meia-noite do dia 1 no horário do Pacífico.
-const BILLING_TIME_ZONE = "America/Los_Angeles"
 
 export const settings = {
   HOST,
@@ -28,5 +26,4 @@ export const settings = {
   PLACES_API_URL,
   MONTHLY_REQUEST_LIMIT,
   REQUESTS_PER_MINUTE,
-  BILLING_TIME_ZONE,
 }
