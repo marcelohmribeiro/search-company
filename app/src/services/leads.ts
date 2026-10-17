@@ -1,11 +1,10 @@
 import { api } from './_api'
-import { settings } from 'src/config'
 import type { Lead, LeadFilterOptions, LeadFilters, LeadPage, LeadStatus } from 'src/types'
 
 /**
  * Query string dos filtros, sem os campos vazios.
  */
-export function leadFiltersToParams(filters: LeadFilters) {
+function leadFiltersToParams(filters: LeadFilters) {
 	const params = new URLSearchParams()
 	if (filters.siteStatus.length) params.set('siteStatus', filters.siteStatus.join(','))
 	if (filters.status.length) params.set('status', filters.status.join(','))
@@ -33,8 +32,4 @@ export async function fetchLeadFilterOptions() {
 export async function updateLead(id: string, changes: { status?: LeadStatus; notes?: string | null }) {
 	const { data } = await api.patch<Lead>(`/leads/${encodeURIComponent(id)}`, changes)
 	return data
-}
-
-export function leadsCsvUrl(filters: LeadFilters) {
-	return `${settings.API_URL}/leads/export.csv?${leadFiltersToParams(filters)}`
 }

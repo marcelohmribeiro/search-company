@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
-import { CircleAlert, Download } from 'lucide-react'
+import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
 import LeadDetailSheet from 'src/components/leads/LeadDetailSheet'
 import LeadFilters from 'src/components/leads/LeadFilters'
 import LeadsTable from 'src/components/leads/LeadsTable'
 import { Alert, AlertDescription, AlertTitle } from 'src/components/ui/alert'
-import { Button } from 'src/components/ui/button'
 import { SITE_STATUS_OPTIONS } from 'src/constants/labels'
 import { useDebouncedValue } from 'src/hooks/useDebouncedValue'
 import { plural } from 'src/lib/format'
-import { fetchLeadFilterOptions, fetchLeads, getErrorMessage, leadsCsvUrl, updateLead } from 'src/services'
+import { fetchLeadFilterOptions, fetchLeads, getErrorMessage, updateLead } from 'src/services'
 import type { Lead, LeadFilterOptions, LeadFilters as Filters, LeadPage, LeadStatus } from 'src/types'
 
 const PAGE_SIZE = 50
@@ -93,14 +92,6 @@ export default function Leads() {
 			<PageHeader
 				title='Leads'
 				description={data ? `${plural(total, 'empresa encontrada', 'empresas encontradas')} com esses filtros.` : 'Carregando…'}
-				actions={
-					<Button variant='outline' asChild>
-						<a href={leadsCsvUrl(filters)}>
-							<Download />
-							Exportar CSV
-						</a>
-					</Button>
-				}
 			/>
 
 			<LeadFilters filters={filters} options={options} onChange={changeFilters} onReset={resetFilters} />
