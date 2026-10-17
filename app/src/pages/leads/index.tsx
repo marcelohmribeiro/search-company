@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigationType, useSearchParams } from 'react-router'
 import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
@@ -6,37 +7,55 @@ import LeadDetailSheet from 'src/components/leads/LeadDetailSheet'
 import LeadFilters from 'src/components/leads/LeadFilters'
 import LeadsTable from 'src/components/leads/LeadsTable'
 import { Alert, AlertDescription, AlertTitle } from 'src/components/ui/alert'
-import { SITE_STATUS_OPTIONS } from 'src/constants/labels'
-import { useDebouncedValue } from 'src/hooks/useDebouncedValue'
 import { plural } from 'src/lib/format'
+import { buildLeadSearchParams, parseLeadQuery } from 'src/lib/leadQuery'
+import type { LeadQuery } from 'src/lib/leadQuery'
 import { fetchLeadFilterOptions, fetchLeads, getErrorMessage, updateLead } from 'src/services'
+import { useLeadsViewStore } from 'src/store/leadsViewStore'
 import type { Lead, LeadFilterOptions, LeadFilters as Filters, LeadPage, LeadStatus } from 'src/types'
 
-const PAGE_SIZE = 50
-
-const DEFAULT_FILTERS: Filters = {
-	siteStatus: SITE_STATUS_OPTIONS.map((option) => option.value).filter((value) => value !== 'HAS_WEBSITE'),
-	status: [],
-	businessStatus: [],
-	minRating: '',
-	minReviews: '',
-	city: '',
-	category: '',
-	neighborhood: '',
-	q: '',
-	orderBy: 'reviews',
-}
+// Campos digitados: a URL (e a busca na API) só muda depois de uma pausa na digitação.
+type TextFilters = Pick<Filters, 'q' | 'minReviews'>
+const TEXT_DEBOUNCE_MS = 300
 
 export default function Leads() {
-	const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-	const [page, setPage] = useState(1)
+	const [searchParams, setSearchParams] = useSearchParams()
+	const location = useLocation()
+	const navigationType = useNavigationType()
+	const setLastSearch = useLeadsViewStore((state) => state.setSearch)
+
+	const search = searchParams.toString()
+	const query = useMemo(() => parseLeadQuery(new URLSearchParams(search)), [search])
+	const { filters, page, pageSize } = query
+
+	const [text, setText] = useState<TextFilters>({ q: filters.q, minReviews: filters.minReviews })
+	const pendingText = useRef<Partial<TextFilters>>({})
+	const textTimer = useRef<number | undefined>(undefined)
+
 	const [data, setData] = useState<LeadPage | null>(null)
 	const [options, setOptions] = useState<LeadFilterOptions>({ cities: [], categories: [], neighborhoods: [] })
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [selected, setSelected] = useState<Lead | null>(null)
 	const [sheetOpen, setSheetOpen] = useState(false)
-	const debouncedFilters = useDebouncedValue(filters, 300)
+
+	/** Aplica uma mudança sobre a query atual da URL. `push` cria uma entrada no histórico do navegador. */
+	const updateQuery = useCallback(
+		(change: (current: LeadQuery) => LeadQuery, { push = false } = {}) =>
+			setSearchParams((current) => buildLeadSearchParams(change(parseLeadQuery(current))), { replace: !push }),
+		[setSearchParams],
+	)
+
+	useEffect(() => {
+		setLastSearch(location.search)
+	}, [location.search, setLastSearch])
+
+	// Voltar e avançar no navegador trocam a URL sem passar pelos campos digitados.
+	useEffect(() => {
+		if (navigationType === 'POP') setText({ q: filters.q, minReviews: filters.minReviews })
+	}, [location.key, navigationType, filters.q, filters.minReviews])
+
+	useEffect(() => () => window.clearTimeout(textTimer.current), [])
 
 	useEffect(() => {
 		fetchLeadFilterOptions()
@@ -47,7 +66,7 @@ export default function Leads() {
 	useEffect(() => {
 		let ignore = false
 		setLoading(true)
-		fetchLeads(debouncedFilters, page, PAGE_SIZE)
+		fetchLeads(query.filters, query.page, query.pageSize)
 			.then((result) => {
 				if (ignore) return
 				setData(result)
@@ -58,14 +77,48 @@ export default function Leads() {
 		return () => {
 			ignore = true
 		}
-	}, [debouncedFilters, page])
+	}, [query])
 
-	const changeFilters = (changes: Partial<Filters>) => {
-		setFilters((current) => ({ ...current, ...changes }))
-		setPage(1)
+	// Uma URL antiga pode apontar para uma página que não existe mais com os filtros atuais.
+	useEffect(() => {
+		if (!data) return
+		const lastPage = Math.max(1, Math.ceil(data.total / data.pageSize))
+		if (page > lastPage) updateQuery((current) => ({ ...current, page: lastPage }))
+	}, [data, page, updateQuery])
+
+	const changeFilters = (changes: Partial<Filters>) =>
+		updateQuery((current) => ({ ...current, filters: { ...current.filters, ...changes }, page: 1 }))
+
+	function changeText(changes: Partial<TextFilters>) {
+		setText((current) => ({ ...current, ...changes }))
+		pendingText.current = { ...pendingText.current, ...changes }
+		window.clearTimeout(textTimer.current)
+		textTimer.current = window.setTimeout(() => {
+			const pending = pendingText.current
+			pendingText.current = {}
+			changeFilters(pending)
+		}, TEXT_DEBOUNCE_MS)
 	}
 
-	const resetFilters = () => changeFilters(DEFAULT_FILTERS)
+	function handleFiltersChange({ q, minReviews, ...rest }: Partial<Filters>) {
+		if (q !== undefined) changeText({ q })
+		if (minReviews !== undefined) changeText({ minReviews })
+		if (Object.keys(rest).length) changeFilters(rest)
+	}
+
+	function resetFilters() {
+		window.clearTimeout(textTimer.current)
+		pendingText.current = {}
+		setText({ q: '', minReviews: '' })
+		setSearchParams(new URLSearchParams(), { replace: true })
+	}
+
+	function changePage(next: number) {
+		updateQuery((current) => ({ ...current, page: next }), { push: true })
+		document.getElementById('leads-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+	}
+
+	const changePageSize = (next: number) => updateQuery((current) => ({ ...current, pageSize: next, page: 1 }))
 
 	const replaceLead = (lead: Lead) =>
 		setData((current) => current && { ...current, items: current.items.map((item) => (item.id === lead.id ? lead : item)) })
@@ -94,7 +147,12 @@ export default function Leads() {
 				description={data ? `${plural(total, 'empresa encontrada', 'empresas encontradas')} com esses filtros.` : 'Carregando…'}
 			/>
 
-			<LeadFilters filters={filters} options={options} onChange={changeFilters} onReset={resetFilters} />
+			<LeadFilters
+				filters={{ ...filters, ...text }}
+				options={options}
+				onChange={handleFiltersChange}
+				onReset={resetFilters}
+			/>
 
 			{error && (
 				<Alert variant='destructive'>
@@ -109,10 +167,11 @@ export default function Leads() {
 					leads={data?.items ?? []}
 					total={total}
 					page={page}
-					pageSize={PAGE_SIZE}
+					pageSize={pageSize}
 					loading={loading && !data}
 					refreshing={loading && !!data}
-					onPageChange={setPage}
+					onPageChange={changePage}
+					onPageSizeChange={changePageSize}
 					onOpen={openLead}
 					onStatusChange={changeStatus}
 					onResetFilters={resetFilters}

@@ -4,6 +4,7 @@ import UsageMeter from 'src/components/UsageMeter'
 import { Toaster } from 'src/components/ui/sonner'
 import { TooltipProvider } from 'src/components/ui/tooltip'
 import { cn } from 'src/lib/utils'
+import { useLeadsViewStore } from 'src/store/leadsViewStore'
 
 const NAV_ITEMS = [
 	{ to: '/', label: 'Buscar', icon: Search, end: true },
@@ -11,6 +12,8 @@ const NAV_ITEMS = [
 ]
 
 export default function Layout() {
+	const leadsSearch = useLeadsViewStore((state) => state.search)
+
 	return (
 		<TooltipProvider>
 			<div className='flex min-h-screen flex-col bg-muted/40'>
@@ -27,7 +30,7 @@ export default function Layout() {
 							{NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
 								<NavLink
 									key={to}
-									to={to}
+									to={to === '/leads' ? `/leads${leadsSearch}` : to}
 									end={end}
 									className={({ isActive }) =>
 										cn(

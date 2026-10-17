@@ -7,26 +7,18 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from 'src/components/ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
 import { Separator } from 'src/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from 'src/components/ui/toggle-group'
-import { BUSINESS_STATUS_OPTIONS, LEAD_STATUS_OPTIONS, SITE_STATUS_OPTIONS } from 'src/constants/labels'
+import {
+	BUSINESS_STATUS_OPTIONS,
+	LEAD_ORDER_OPTIONS,
+	LEAD_STATUS_OPTIONS,
+	MIN_RATING_OPTIONS,
+	SITE_STATUS_OPTIONS,
+} from 'src/constants/labels'
 import { cn } from 'src/lib/utils'
 import type { BusinessStatus, LeadFilterOptions, LeadFilters as Filters, LeadOrder, LeadStatus, SiteStatus } from 'src/types'
 
 // O Select do Radix não aceita valor vazio; "all" representa "sem filtro".
 const ALL = 'all'
-
-const ORDER_OPTIONS: { value: LeadOrder; label: string }[] = [
-	{ value: 'reviews', label: 'Mais avaliações primeiro' },
-	{ value: 'rating', label: 'Maior nota primeiro' },
-	{ value: 'name', label: 'Nome (A–Z)' },
-	{ value: 'recent', label: 'Mais recentes primeiro' },
-]
-
-const RATING_OPTIONS = [
-	{ value: ALL, label: 'Qualquer nota' },
-	{ value: '3.5', label: 'Nota 3,5 ou mais' },
-	{ value: '4', label: 'Nota 4,0 ou mais' },
-	{ value: '4.5', label: 'Nota 4,5 ou mais' },
-]
 
 const CHIP_CLASS =
 	'data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90'
@@ -130,7 +122,8 @@ export default function LeadFilters({ filters, options, onChange, onReset }: Lea
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							{RATING_OPTIONS.map((option) => (
+							<SelectItem value={ALL}>Qualquer nota</SelectItem>
+							{MIN_RATING_OPTIONS.map((option) => (
 								<SelectItem key={option.value} value={option.value}>
 									{option.label}
 								</SelectItem>
@@ -149,7 +142,7 @@ export default function LeadFilters({ filters, options, onChange, onReset }: Lea
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							{ORDER_OPTIONS.map((option) => (
+							{LEAD_ORDER_OPTIONS.map((option) => (
 								<SelectItem key={option.value} value={option.value}>
 									{option.label}
 								</SelectItem>

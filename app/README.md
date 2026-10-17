@@ -29,7 +29,6 @@ src/
 ├── config/            # settings a partir das env vars
 ├── constants/         # rótulos em português dos enums
 ├── css/               # entrada do Tailwind
-├── hooks/
 ├── lib/               # utils (cn), formatação pt-BR, busca e telefone/WhatsApp
 ├── pages/             # index.tsx (Busca), leads/ e layout.tsx
 ├── routes/            # createBrowserRouter

@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, MapPin, MessageCircle, PanelRightOpen, SearchX, Star, StickyNote } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ellipsis, MapPin, MessageCircle, PanelRightOpen, SearchX, Star, StickyNote } from 'lucide-react'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
 import SiteStatusBadge from 'src/components/leads/SiteStatusBadge'
 import { Badge } from 'src/components/ui/badge'
 import { Button } from 'src/components/ui/button'
 import { Card } from 'src/components/ui/card'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from 'src/components/ui/empty'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
 import { Skeleton } from 'src/components/ui/skeleton'
 import { Spinner } from 'src/components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 'src/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from 'src/components/ui/tooltip'
 import { businessStatusLabel } from 'src/constants/labels'
 import { formatNumber, formatRating } from 'src/lib/format'
+import { PAGE_SIZE_OPTIONS, pageItems } from 'src/lib/leadQuery'
 import { whatsappUrl } from 'src/lib/phone'
 import type { Lead, LeadStatus } from 'src/types'
 
@@ -27,6 +29,7 @@ interface LeadsTableProps {
 	/** Recarga com dados antigos ainda na tela. */
 	refreshing: boolean
 	onPageChange: (page: number) => void
+	onPageSizeChange: (pageSize: number) => void
 	onOpen: (lead: Lead) => void
 	onStatusChange: (lead: Lead, status: LeadStatus) => void
 	onResetFilters: () => void
@@ -66,6 +69,7 @@ export default function LeadsTable({
 	loading,
 	refreshing,
 	onPageChange,
+	onPageSizeChange,
 	onOpen,
 	onStatusChange,
 	onResetFilters,
@@ -96,7 +100,7 @@ export default function LeadsTable({
 	}
 
 	return (
-		<Card className='gap-0 py-0'>
+		<Card id='leads-table' className='scroll-mt-40 gap-0 py-0 sm:scroll-mt-24'>
 			<Table className={refreshing ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
 				<TableHeader className='bg-muted/50'>
 					<TableRow>
@@ -202,33 +206,74 @@ export default function LeadsTable({
 				</TableBody>
 			</Table>
 
-			<div className='flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm'>
+			<div className='flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t px-4 py-3 text-sm'>
 				<span className='flex items-center gap-2 text-muted-foreground'>
 					{refreshing && <Spinner className='size-3.5' />}
 					{loading ? 'Carregando…' : `Mostrando ${formatNumber(first)}–${formatNumber(last)} de ${formatNumber(total)}`}
 				</span>
-				<div className='flex items-center gap-2'>
-					<span className='text-muted-foreground tabular-nums'>
-						Página {page} de {pages}
-					</span>
-					<Button
-						variant='outline'
-						size='icon-sm'
-						onClick={() => onPageChange(page - 1)}
-						disabled={page <= 1 || loading}
-						aria-label='Página anterior'
-					>
-						<ChevronLeft />
-					</Button>
-					<Button
-						variant='outline'
-						size='icon-sm'
-						onClick={() => onPageChange(page + 1)}
-						disabled={page >= pages || loading}
-						aria-label='Próxima página'
-					>
-						<ChevronRight />
-					</Button>
+
+				<div className='flex flex-wrap items-center gap-x-6 gap-y-3'>
+					<div className='flex items-center gap-2'>
+						<span className='text-muted-foreground'>Linhas por página</span>
+						<Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+							<SelectTrigger size='sm' className='w-18' aria-label='Linhas por página'>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{PAGE_SIZE_OPTIONS.map((size) => (
+									<SelectItem key={size} value={String(size)}>
+										{size}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+
+					<nav aria-label='Paginação' className='flex items-center gap-1'>
+						<Button
+							variant='ghost'
+							size='icon-sm'
+							onClick={() => onPageChange(page - 1)}
+							disabled={page <= 1 || loading}
+							aria-label='Página anterior'
+						>
+							<ChevronLeft />
+						</Button>
+						<span className='px-2 text-muted-foreground tabular-nums sm:hidden'>
+							{page} de {pages}
+						</span>
+						<div className='hidden items-center gap-1 sm:flex'>
+							{pageItems(page, pages).map((item, index) =>
+								item === null ? (
+									<span key={`gap-${index}`} className='flex size-7 items-center justify-center text-muted-foreground'>
+										<Ellipsis className='size-4' />
+									</span>
+								) : (
+									<Button
+										key={item}
+										variant={item === page ? 'outline' : 'ghost'}
+										size='icon-sm'
+										className='tabular-nums'
+										onClick={() => onPageChange(item)}
+										disabled={loading}
+										aria-label={`Página ${item}`}
+										aria-current={item === page ? 'page' : undefined}
+									>
+										{item}
+									</Button>
+								),
+							)}
+						</div>
+						<Button
+							variant='ghost'
+							size='icon-sm'
+							onClick={() => onPageChange(page + 1)}
+							disabled={page >= pages || loading}
+							aria-label='Próxima página'
+						>
+							<ChevronRight />
+						</Button>
+					</nav>
 				</div>
 			</div>
 		</Card>

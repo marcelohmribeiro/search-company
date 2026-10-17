@@ -1,4 +1,4 @@
-import type { BusinessStatus, LeadStatus, SearchStatus, SiteStatus } from 'src/types'
+import type { BusinessStatus, LeadOrder, LeadStatus, SearchStatus, SiteStatus } from 'src/types'
 
 interface Option<T> {
 	value: T
@@ -29,6 +29,20 @@ export const BUSINESS_STATUS_OPTIONS: Option<BusinessStatus>[] = [
 	{ value: 'CLOSED_TEMPORARILY', label: 'Fechada temporariamente' },
 	{ value: 'CLOSED_PERMANENTLY', label: 'Fechada definitivamente' },
 	{ value: 'FUTURE_OPENING', label: 'Abre em breve' },
+]
+
+export const LEAD_ORDER_OPTIONS: Option<LeadOrder>[] = [
+	{ value: 'reviews', label: 'Mais avaliações primeiro' },
+	{ value: 'rating', label: 'Maior nota primeiro' },
+	{ value: 'name', label: 'Nome (A–Z)' },
+	{ value: 'recent', label: 'Mais recentes primeiro' },
+]
+
+/** Valores aceitos no filtro de nota mínima, como texto da query string. */
+export const MIN_RATING_OPTIONS: Option<string>[] = [
+	{ value: '3.5', label: 'Nota 3,5 ou mais' },
+	{ value: '4', label: 'Nota 4,0 ou mais' },
+	{ value: '4.5', label: 'Nota 4,5 ou mais' },
 ]
 
 export const SEARCH_STATUS_OPTIONS: Record<SearchStatus, { label: string; className: string }> = {
