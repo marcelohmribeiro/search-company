@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Ellipsis, MapPin, MessageCircle, PanelRightOpen, SearchX, Star, StickyNote } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Ellipsis, MapPin, MessageCircle, PanelRightOpen, SearchX, Star, StickyNote } from 'lucide-react'
+import { toast } from 'sonner'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
 import SiteStatusBadge from 'src/components/leads/SiteStatusBadge'
 import { Badge } from 'src/components/ui/badge'
@@ -13,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 's
 import { Tooltip, TooltipContent, TooltipTrigger } from 'src/components/ui/tooltip'
 import { businessStatusLabel } from 'src/constants/labels'
 import { formatNumber, formatRating } from 'src/lib/format'
+import { landingPagePrompt } from 'src/lib/landingPrompt'
 import { PAGE_SIZE_OPTIONS, pageItems } from 'src/lib/leadQuery'
 import { whatsappUrl } from 'src/lib/phone'
 import type { Lead, LeadStatus } from 'src/types'
@@ -48,6 +50,29 @@ function IconLink({ href, label, children }: { href: string; label: string; chil
 			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	)
+}
+
+const MISSING_LABELS: Record<string, string> = {
+	'{instagram}': 'o Instagram',
+	'{google_fotos_link}': 'as fotos no Maps',
+}
+
+async function copyLandingPrompt(lead: Lead) {
+	const { text, missing } = landingPagePrompt(lead)
+	try {
+		await navigator.clipboard.writeText(text)
+	} catch {
+		toast.error('Não foi possível copiar', { description: 'O navegador bloqueou o acesso à área de transferência.' })
+		return
+	}
+	if (missing.length) {
+		const absent = missing.map((marker) => MISSING_LABELS[marker]).join(' nem ')
+		toast.warning('Prompt copiado, mas incompleto', {
+			description: `O Google não tem ${absent} dessa empresa. Preencha ${missing.join(' e ')} antes de usar.`,
+		})
+	} else {
+		toast.success('Prompt da landing page copiado')
+	}
 }
 
 function Rating({ lead }: { lead: Lead }) {
@@ -127,7 +152,7 @@ export default function LeadsTable({
 										</TableCell>
 									))}
 									<TableCell className='pr-4'>
-										<Skeleton className='ml-auto h-7 w-24' />
+										<Skeleton className='ml-auto h-7 w-28' />
 									</TableCell>
 								</TableRow>
 							))
@@ -190,6 +215,19 @@ export default function LeadsTable({
 														<MessageCircle className='text-green-600' />
 													</IconLink>
 												)}
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<Button
+															variant='ghost'
+															size='icon-sm'
+															onClick={() => copyLandingPrompt(lead)}
+															aria-label='Copiar prompt da landing page'
+														>
+															<Copy />
+														</Button>
+													</TooltipTrigger>
+													<TooltipContent>Copiar prompt da landing page</TooltipContent>
+												</Tooltip>
 												<Tooltip>
 													<TooltipTrigger asChild>
 														<Button variant='ghost' size='icon-sm' onClick={() => onOpen(lead)} aria-label='Ver detalhes'>
