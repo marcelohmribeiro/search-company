@@ -33,7 +33,6 @@ function details(item: SearchComboProgress) {
 		plural(item.search.pagesFetched, 'página', 'páginas'),
 		plural(item.search.newLeadsCount, 'lead novo', 'leads novos'),
 	]
-	if (item.csv?.file) parts.push(`CSV ${item.csv.file}`)
 	return parts.join(' · ')
 }
 
@@ -92,9 +91,6 @@ export default function SearchProgressCard({ city, items, running }: SearchProgr
 											<ItemDescription className={cn(item.status === 'error' && 'text-destructive')}>
 												{description}
 											</ItemDescription>
-										)}
-										{item.csv?.error && (
-											<ItemDescription className='text-destructive'>Falha ao gravar o CSV: {item.csv.error}</ItemDescription>
 										)}
 									</ItemContent>
 									<ItemActions>

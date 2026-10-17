@@ -1,5 +1,4 @@
 import "dotenv/config"
-import { fileURLToPath } from "node:url"
 
 // Teto da cota grátis de Text Search Enterprise (1.000/mês) com margem. O .env só pode baixar esse valor.
 const HARD_REQUEST_LIMIT = 990
@@ -19,7 +18,6 @@ const MONTHLY_REQUEST_LIMIT = Math.min(readNumber(process.env.MONTHLY_REQUEST_LI
 const REQUESTS_PER_MINUTE = readNumber(process.env.REQUESTS_PER_MINUTE, 10)
 // A cota grátis do Google reinicia à meia-noite do dia 1 no horário do Pacífico.
 const BILLING_TIME_ZONE = "America/Los_Angeles"
-const CSV_DIR = process.env.CSV_DIR || fileURLToPath(new URL("../../csv", import.meta.url))
 
 export const settings = {
   HOST,
@@ -31,5 +29,4 @@ export const settings = {
   MONTHLY_REQUEST_LIMIT,
   REQUESTS_PER_MINUTE,
   BILLING_TIME_ZONE,
-  CSV_DIR,
 }

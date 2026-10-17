@@ -36,8 +36,6 @@ export interface SearchResult {
 	skipped: boolean
 	search: Search
 	usage: Usage
-	/** Última gravação do CSV da cidade. Ausente quando a busca foi pulada. */
-	csv?: { file: string | null; error?: string }
 }
 
 /** Uma combinação de categoria e bairro, que vira uma chamada a `POST /searches`. */
@@ -53,7 +51,6 @@ export interface SearchComboProgress extends SearchCombo {
 	status: SearchComboStatus
 	search?: Search
 	message?: string
-	csv?: SearchResult['csv']
 }
 
 /** O que o formulário de busca envia para execução. */

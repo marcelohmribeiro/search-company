@@ -74,7 +74,7 @@ export default function Index() {
 							? 'limit'
 							: 'error'
 				if (!result.skipped) newLeads += result.search.newLeadsCount
-				updateItem(index, { status, search: result.search, message: result.search.error ?? undefined, csv: result.csv })
+				updateItem(index, { status, search: result.search, message: result.search.error ?? undefined })
 
 				// Um erro do Google (chave inválida, cota por minuto) tende a se repetir e gastaria requisições à toa.
 				if (status === 'limit' || status === 'error') {

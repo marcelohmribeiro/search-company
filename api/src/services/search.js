@@ -1,7 +1,6 @@
 import { prisma } from "./prisma.js";
 import { searchText } from "./places.js";
 import { getUsage, reserveRequest, finishRequest } from "./usage.js";
-import { writeCityCsv } from "./csvFiles.js";
 import { settings } from "#src/config";
 import { classifySite, httpError } from "#src/utils";
 
@@ -111,16 +110,6 @@ async function saveLeads(places, search, page) {
 	return ids.filter((id) => !known.has(id)).length;
 }
 
-// Os leads já estão no banco quando o CSV é gravado: uma falha no arquivo não desfaz nem invalida a busca.
-async function saveCityCsv(city) {
-	try {
-		return { file: await writeCityCsv(city) };
-	} catch (csvError) {
-		console.error(`[CSV] Falha ao gravar o CSV de ${city}:`, csvError);
-		return { file: null, error: csvError.message };
-	}
-}
-
 function describeGoogleError(result) {
 	const { status, message } = result.body?.error ?? {};
 	return [result.status, status, message].filter(Boolean).join(" ");
@@ -143,15 +132,14 @@ async function findCompletedSearch(textQuery, maxPages) {
 
 /**
  * Roda uma busca (uma combinação categoria × bairro × cidade) na Places API, página por página,
- * e grava os leads de cada página no banco e no CSV da cidade. Cada página reserva uma requisição no limite
+ * e grava os leads de cada página no banco. Cada página reserva uma requisição no limite
  * mensal antes de ser enviada, e a busca para no limite, no primeiro erro ou quando não há próxima página.
  * Não há nova tentativa.
  * @param {{ city: string, category: string, neighborhood?: string, maxPages: number, skipIfDone: boolean }} input
  * @param {string} apiKey Chave da API do Google enviada pelo cliente. Só é repassada ao Google: não vai para o
- * banco, para o CSV nem para o log.
- * @returns {Promise<{ skipped: boolean, search: object, usage: object, csv?: { file: string | null, error?: string } }>}
- * `csv` traz o resultado da última gravação do CSV. Com `skipped`, `search` é a busca anterior,
- * nenhuma requisição é feita e não há `csv`.
+ * banco nem para o log.
+ * @returns {Promise<{ skipped: boolean, search: object, usage: object }>} Com `skipped`, `search` é a
+ * busca anterior e nenhuma requisição é feita.
  * @throws 409 com outra busca em andamento, 429 com o limite do mês atingido.
  */
 async function runSearch({ city, category, neighborhood, maxPages, skipIfDone }, apiKey) {
@@ -181,7 +169,6 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 		let status = "DONE";
 		let error = null;
 		const totals = { pagesFetched: 0, resultsCount: 0, newLeadsCount: 0 };
-		let csv = { file: null };
 
 		try {
 			for (let page = 1; page <= maxPages; page++) {
@@ -225,7 +212,6 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 				totals.pagesFetched++;
 				totals.resultsCount += places.length;
 				totals.newLeadsCount += await saveLeads(places, search, page);
-				if (places.length) csv = await saveCityCsv(search.city);
 
 				pageToken = result.body?.nextPageToken;
 				if (!pageToken) break;
@@ -247,7 +233,7 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 			},
 		});
 
-		return { skipped: false, search, usage: await getUsage(), csv };
+		return { skipped: false, search, usage: await getUsage() };
 	} finally {
 		searchRunning = false;
 	}
