@@ -39,3 +39,27 @@ export interface SearchResult {
 	/** Última gravação do CSV da cidade. Ausente quando a busca foi pulada. */
 	csv?: { file: string | null; error?: string }
 }
+
+/** Uma combinação de categoria e bairro, que vira uma chamada a `POST /searches`. */
+export interface SearchCombo {
+	category: string
+	neighborhood?: string
+}
+
+export type SearchComboStatus = 'pending' | 'running' | 'done' | 'skipped' | 'limit' | 'error' | 'stopped'
+
+/** Andamento de uma combinação durante a execução de uma busca na tela. */
+export interface SearchComboProgress extends SearchCombo {
+	status: SearchComboStatus
+	search?: Search
+	message?: string
+	csv?: SearchResult['csv']
+}
+
+/** O que o formulário de busca envia para execução. */
+export interface SearchRequest {
+	city: string
+	combos: SearchCombo[]
+	maxPages: number
+	skipIfDone: boolean
+}

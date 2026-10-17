@@ -1,32 +1,66 @@
 import { NavLink, Outlet } from 'react-router'
-import UsageBadge from 'src/components/UsageBadge'
+import { MapPinned, Search, Users } from 'lucide-react'
+import UsageMeter from 'src/components/UsageMeter'
+import { Toaster } from 'src/components/ui/sonner'
+import { TooltipProvider } from 'src/components/ui/tooltip'
+import { cn } from 'src/lib/utils'
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-	`rounded-md px-3 py-1.5 text-sm font-medium ${isActive ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-200'}`
+const NAV_ITEMS = [
+	{ to: '/', label: 'Buscar', icon: Search, end: true },
+	{ to: '/leads', label: 'Leads', icon: Users, end: false },
+]
 
 export default function Layout() {
 	return (
-		<div className='flex min-h-screen w-full flex-col bg-zinc-50 text-zinc-900'>
-			<header className='border-b border-zinc-200 bg-white'>
-				<div className='mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3'>
-					<span className='text-lg font-semibold'>Search Company</span>
-					<nav className='flex gap-1'>
-						<NavLink to='/' end className={navLinkClass}>
-							Busca
-						</NavLink>
-						<NavLink to='/leads' className={navLinkClass}>
-							Leads
-						</NavLink>
-					</nav>
-					<div className='ml-auto'>
-						<UsageBadge />
+		<TooltipProvider>
+			<div className='flex min-h-screen flex-col bg-muted/40'>
+				<header className='sticky top-0 z-30 border-b bg-background/85 backdrop-blur'>
+					<div className='mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6'>
+						<div className='flex items-center gap-2.5'>
+							<div className='flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground'>
+								<MapPinned className='size-4' />
+							</div>
+							<span className='font-heading font-semibold tracking-tight'>Search Company</span>
+						</div>
+
+						<nav className='flex items-center gap-1'>
+							{NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+								<NavLink
+									key={to}
+									to={to}
+									end={end}
+									className={({ isActive }) =>
+										cn(
+											'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors',
+											isActive
+												? 'bg-muted text-foreground'
+												: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+										)
+									}
+								>
+									<Icon className='size-4' />
+									{label}
+								</NavLink>
+							))}
+						</nav>
+
+						<div className='w-full sm:ml-auto sm:w-auto'>
+							<UsageMeter />
+						</div>
 					</div>
-				</div>
-			</header>
-			<main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6'>
-				<Outlet />
-			</main>
-			<footer className='px-4 py-4 text-center text-xs text-zinc-500'>Dados das empresas: Google Maps</footer>
-		</div>
+				</header>
+
+				<main className='mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6'>
+					<Outlet />
+				</main>
+
+				<footer className='border-t bg-background'>
+					<div className='mx-auto max-w-7xl px-4 py-4 text-xs text-muted-foreground sm:px-6'>
+						Dados das empresas: Google Maps
+					</div>
+				</footer>
+			</div>
+			<Toaster position='bottom-right' />
+		</TooltipProvider>
 	)
 }

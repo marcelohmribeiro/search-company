@@ -64,4 +64,9 @@ export default [
       ],
     },
   },
+  {
+    // Componentes gerados pelo shadcn exportam variantes junto com os componentes.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ]
