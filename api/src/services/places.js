@@ -69,17 +69,17 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /**
  * Envia uma única requisição à Text Search (New). Cada chamada é uma requisição cobrada pelo Google,
  * então ela só deve ser feita depois de `reserveRequest`.
- * @param {{ textQuery: string, pageToken?: string }} params Na paginação, `textQuery` precisa ser
- * igual ao da primeira página.
+ * @param {{ textQuery: string, pageToken?: string, apiKey: string }} params Na paginação, `textQuery` precisa
+ * ser igual ao da primeira página. `apiKey` é a chave informada na busca; ela só é repassada ao Google.
  * @returns {Promise<{ ok: boolean, status: number, body: any }>} `body` é `null` quando a resposta não é JSON.
  * @throws Erro de rede ou de timeout, sem resposta do Google.
  */
-async function searchText({ textQuery, pageToken }) {
+async function searchText({ textQuery, pageToken, apiKey }) {
 	const response = await fetch(settings.PLACES_API_URL, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			"X-Goog-Api-Key": settings.GOOGLE_API_KEY,
+			"X-Goog-Api-Key": apiKey,
 			"X-Goog-FieldMask": FIELD_MASK,
 		},
 		body: JSON.stringify({

@@ -15,4 +15,14 @@ const searchInputSchema = z.object({
 	skipIfDone: z.boolean().default(true),
 });
 
-export { searchInputSchema };
+/**
+ * Header `X-Google-Api-Key` de `POST /searches`: a chave da API do Google de quem faz a busca.
+ * As chaves do Google têm 39 caracteres; o limite só barra valores absurdos.
+ */
+const googleApiKeySchema = z
+	.string({ error: "Informe a chave da API do Google." })
+	.trim()
+	.min(1, "Informe a chave da API do Google.")
+	.max(200, "Chave da API do Google inválida.");
+
+export { searchInputSchema, googleApiKeySchema };

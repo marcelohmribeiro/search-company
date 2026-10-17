@@ -147,15 +147,14 @@ async function findCompletedSearch(textQuery, maxPages) {
  * mensal antes de ser enviada, e a busca para no limite, no primeiro erro ou quando não há próxima página.
  * Não há nova tentativa.
  * @param {{ city: string, category: string, neighborhood?: string, maxPages: number, skipIfDone: boolean }} input
+ * @param {string} apiKey Chave da API do Google enviada pelo cliente. Só é repassada ao Google: não vai para o
+ * banco, para o CSV nem para o log.
  * @returns {Promise<{ skipped: boolean, search: object, usage: object, csv?: { file: string | null, error?: string } }>}
  * `csv` traz o resultado da última gravação do CSV. Com `skipped`, `search` é a busca anterior,
  * nenhuma requisição é feita e não há `csv`.
- * @throws 503 sem `GOOGLE_API_KEY`, 409 com outra busca em andamento, 429 com o limite do mês atingido.
+ * @throws 409 com outra busca em andamento, 429 com o limite do mês atingido.
  */
-async function runSearch({ city, category, neighborhood, maxPages, skipIfDone }) {
-	if (!settings.GOOGLE_API_KEY) {
-		throw httpError(503, "GOOGLE_API_KEY não está configurada no api/.env.");
-	}
+async function runSearch({ city, category, neighborhood, maxPages, skipIfDone }, apiKey) {
 	if (searchRunning) {
 		throw httpError(409, "Já existe uma busca em andamento.");
 	}
@@ -200,7 +199,7 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone })
 
 				let result;
 				try {
-					result = await searchText({ textQuery, pageToken });
+					result = await searchText({ textQuery, pageToken, apiKey });
 				} catch (fetchError) {
 					await finishRequest(request.id, { status: "ERROR", error: fetchError.message });
 					status = "FAILED";

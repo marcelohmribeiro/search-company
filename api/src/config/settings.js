@@ -14,7 +14,6 @@ const PORT = process.env.PORT
 const FRONTEND_URL = process.env.FRONTEND_URL
 const DATABASE_URL = process.env.DATABASE_URL
 const JWT_SECRET = process.env.JWT_SECRET
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY
 const PLACES_API_URL = process.env.PLACES_API_URL || "https://places.googleapis.com/v1/places:searchText"
 const MONTHLY_REQUEST_LIMIT = Math.min(readNumber(process.env.MONTHLY_REQUEST_LIMIT, HARD_REQUEST_LIMIT), HARD_REQUEST_LIMIT)
 const REQUESTS_PER_MINUTE = readNumber(process.env.REQUESTS_PER_MINUTE, 10)
@@ -28,7 +27,6 @@ export const settings = {
   FRONTEND_URL,
   JWT_SECRET,
   DATABASE_URL,
-  GOOGLE_API_KEY,
   PLACES_API_URL,
   MONTHLY_REQUEST_LIMIT,
   REQUESTS_PER_MINUTE,
