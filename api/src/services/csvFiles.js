@@ -1,13 +1,67 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "./prisma.js";
-import { LEAD_CSV_COLUMNS } from "./leads.js";
 import { settings } from "#src/config";
 import { buildCsv } from "#src/utils";
 
 const UNKNOWN_STATE = "XX";
 
-const CITY_CSV_COLUMNS = [...LEAD_CSV_COLUMNS, ["ID do Google", (lead) => lead.id]];
+const SITE_STATUS_LABELS = {
+	NO_WEBSITE: "Sem site",
+	INSTAGRAM_ONLY: "Só Instagram",
+	WHATSAPP_ONLY: "Só WhatsApp",
+	FACEBOOK_ONLY: "Só Facebook",
+	LINK_AGGREGATOR: "Agregador de links",
+	HAS_WEBSITE: "Tem site",
+};
+
+const BUSINESS_STATUS_LABELS = {
+	OPERATIONAL: "Funcionando",
+	CLOSED_TEMPORARILY: "Fechada temporariamente",
+	CLOSED_PERMANENTLY: "Fechada definitivamente",
+	FUTURE_OPENING: "Abre em breve",
+};
+
+const LEAD_STATUS_LABELS = {
+	NEW: "Novo",
+	CONTACTED: "Contatado",
+	REPLIED: "Respondeu",
+	CLOSED: "Fechado",
+	DISCARDED: "Descartado",
+};
+
+/**
+ * Link de conversa individual no WhatsApp a partir do telefone internacional ("+55 85 99999-9999").
+ * @returns {string | null} `null` quando não há telefone.
+ */
+function whatsappLink(internationalPhone) {
+	const digits = internationalPhone?.replace(/\D/g, "");
+	return digits ? `https://wa.me/${digits}` : null;
+}
+
+const CITY_CSV_COLUMNS = [
+	["Nome", (lead) => lead.name],
+	["Categoria", (lead) => lead.category],
+	["Bairro", (lead) => lead.neighborhood ?? lead.searchNeighborhood],
+	["Cidade", (lead) => lead.city],
+	["Estado", (lead) => lead.state],
+	["Endereço", (lead) => lead.address],
+	["Telefone", (lead) => lead.nationalPhone],
+	["WhatsApp", (lead) => whatsappLink(lead.internationalPhone)],
+	["Funcionamento", (lead) => BUSINESS_STATUS_LABELS[lead.businessStatus] ?? lead.businessStatus],
+	["Situação do site", (lead) => SITE_STATUS_LABELS[lead.siteStatus]],
+	["Site", (lead) => lead.websiteUri],
+	["Nota", (lead) => lead.rating?.toString().replace(".", ",")],
+	["Avaliações", (lead) => lead.userRatingCount],
+	["Sem endereço físico", (lead) => (lead.pureServiceArea ? "Sim" : "")],
+	["Horário", (lead) => lead.openingHours.join(" | ")],
+	["Status", (lead) => LEAD_STATUS_LABELS[lead.status]],
+	["Anotações", (lead) => lead.notes],
+	["Google Maps", (lead) => lead.googleMapsUri],
+	["Avaliações no Maps", (lead) => lead.reviewsUri],
+	["Encontrado em", (lead) => lead.firstSeenAt.toISOString().slice(0, 10)],
+	["ID do Google", (lead) => lead.id],
+];
 
 const localDateFormatter = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" });
 

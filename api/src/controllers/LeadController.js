@@ -1,4 +1,4 @@
-import { listLeads, getLeadFilterOptions, updateLead, exportLeadsCsv } from "#src/services";
+import { listLeads, getLeadFilterOptions, updateLead } from "#src/services";
 import { leadQuerySchema, leadUpdateSchema } from "#src/schemas";
 
 const LeadController = () => {
@@ -33,25 +33,10 @@ const LeadController = () => {
     }
   }
 
-  async function exportCsv(req, res, next) {
-    try {
-      const { page, pageSize, orderBy, ...filters } = leadQuerySchema.parse(req.query);
-      const csv = await exportLeadsCsv(filters, { orderBy });
-      const date = new Date().toISOString().slice(0, 10);
-
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="leads-${date}.csv"`);
-      return res.status(200).send(csv);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   return {
     findAll,
     filterOptions,
     update,
-    exportCsv,
   };
 };
 

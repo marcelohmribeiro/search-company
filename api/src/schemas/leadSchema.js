@@ -15,7 +15,7 @@ const commaList = (values) =>
 const withoutEmptyValues = (query) => Object.fromEntries(Object.entries(query ?? {}).filter(([, value]) => value !== ""));
 
 /**
- * Query string de `GET /leads` e `GET /leads/export.csv`: filtros, paginação e ordenação.
+ * Query string de `GET /leads`: filtros, paginação e ordenação.
  * Os filtros de texto ignoram maiúsculas e minúsculas na consulta.
  */
 const leadQuerySchema = z.preprocess(
