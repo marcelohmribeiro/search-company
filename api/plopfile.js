@@ -40,7 +40,7 @@ export default function (plop) {
         type: "append",
         path: "src/controllers/index.js",
         template:
-          'export * from "#src/controllers/{{pascalCase name}}Controller.js";',
+          'export * from "./{{pascalCase name}}Controller.js";',
         unique: true,
       },
       {
