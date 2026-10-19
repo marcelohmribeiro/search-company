@@ -1,9 +1,11 @@
 import { NavLink, Outlet } from 'react-router'
-import { MapPinned, Search, Users } from 'lucide-react'
+import { LogOut, MapPinned, Search, Users } from 'lucide-react'
 import UsageMeter from 'src/components/UsageMeter'
+import { Button } from 'src/components/ui/button'
 import { Toaster } from 'src/components/ui/sonner'
-import { TooltipProvider } from 'src/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from 'src/components/ui/tooltip'
 import { cn } from 'src/lib/utils'
+import { useAuthStore } from 'src/store/authStore'
 import { useLeadsViewStore } from 'src/store/leadsViewStore'
 
 const NAV_ITEMS = [
@@ -13,6 +15,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
 	const leadsSearch = useLeadsViewStore((state) => state.search)
+	const { user, signOut } = useAuthStore()
 
 	return (
 		<TooltipProvider>
@@ -47,8 +50,18 @@ export default function Layout() {
 							))}
 						</nav>
 
-						<div className='w-full sm:ml-auto sm:w-auto'>
-							<UsageMeter />
+						<div className='flex w-full items-center gap-3 sm:ml-auto sm:w-auto'>
+							<div className='flex-1 sm:flex-none'>
+								<UsageMeter />
+							</div>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button variant='ghost' size='icon-sm' onClick={signOut} aria-label='Sair'>
+										<LogOut />
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent>Sair{user && ` (${user.email})`}</TooltipContent>
+							</Tooltip>
 						</div>
 					</div>
 				</header>

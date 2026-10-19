@@ -1,7 +1,7 @@
 import express from "express";
 import { handleError } from "#src/utils"
 import { settings } from "#src/config";
-import { UsageRouter, SearchRouter, LeadRouter } from "#src/routes";
+import { UsageRouter, SearchRouter, LeadRouter, AuthRouter } from "#src/routes";
 import cors from "cors";
 
 const app = express();
@@ -13,6 +13,7 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.json("Servidor rodando");
 });
+app.use("/auth", AuthRouter);
 app.use("/usage", UsageRouter);
 app.use("/searches", SearchRouter);
 app.use("/leads", LeadRouter);

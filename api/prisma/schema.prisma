@@ -142,3 +142,14 @@ model SearchLead {
   @@index([leadId])
   @@index([createdAt])
 }
+
+/// Quem pode usar o app. Só é criado pelo terminal (`bun run user:create`); não há cadastro pela API.
+model User {
+  id           Int      @id @default(autoincrement())
+  /// Sempre em minúsculas.
+  email        String   @unique
+  /// "salt:hash" do scrypt, em hexadecimal. A senha nunca é guardada.
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

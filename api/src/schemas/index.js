@@ -4,3 +4,4 @@ z.config(z.locales.pt());
 
 export * from "./searchSchema.js";
 export * from "./leadSchema.js";
+export * from "./authSchema.js";
