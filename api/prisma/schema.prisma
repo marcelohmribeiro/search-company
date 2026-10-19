@@ -32,13 +32,18 @@ enum SearchStatus {
   FAILED
 }
 
+enum UserRole {
+  ADMIN
+  USER
+}
+
 enum ApiRequestStatus {
   PENDING
   SUCCESS
   ERROR
 }
 
-/// Uma linha por chamada HTTP à Places API. A contagem por `period` é o uso do mês.
+/// Uma linha por chamada HTTP à Places API. A contagem por `period` é o uso do mês, por usuário e por chave.
 model ApiRequest {
   id           Int              @id @default(autoincrement())
   /// Mês de cobrança do Google no fuso America/Los_Angeles, no formato "2026-10".
@@ -54,8 +59,15 @@ model ApiRequest {
   finishedAt   DateTime?
   searchId     Int?
   search       Search?          @relation(fields: [searchId], references: [id])
+  userId       Int
+  user         User             @relation(fields: [userId], references: [id])
+  /// HMAC da chave do Google usada (o mesmo de `User.googleApiKeyHash`). `null` nas requisições feitas antes
+  /// de a chave ficar no banco, que contam pelo `userId`.
+  keyHash      String?
 
   @@index([period])
+  @@index([period, userId])
+  @@index([period, keyHash])
 }
 
 model Search {
@@ -74,13 +86,18 @@ model Search {
   error         String?
   createdAt     DateTime     @default(now())
   finishedAt    DateTime?
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id])
   requests      ApiRequest[]
-  leads         Lead[]
+  userLeads     UserLead[]
   results       SearchLead[]
 
   @@index([textQuery])
+  @@index([userId, createdAt])
 }
 
+/// Uma empresa do Google, a mesma para todos os usuários. Cada busca que a reencontra sobrescreve estes dados.
+/// O que é de cada usuário (status, anotações e busca de origem) fica em `UserLead`.
 model Lead {
   /// `places.id` do Google.
   id                 String       @id
@@ -88,13 +105,8 @@ model Lead {
   address            String?
   /// Bairro informado pelo Google em `addressComponents`.
   neighborhood       String?
-  city               String
   /// Sigla do estado ("CE"), vinda de `addressComponents` (administrative_area_level_1).
   state              String?
-  /// Categoria da busca que encontrou a empresa pela primeira vez.
-  category           String
-  /// Bairro da busca que encontrou a empresa pela primeira vez.
-  searchNeighborhood String?
   primaryType        String?
   primaryTypeName    String?
   nationalPhone      String?
@@ -115,18 +127,39 @@ model Lead {
   photosUri          String?
   /// Objeto Place completo devolvido pela Text Search, com todos os campos do field mask.
   googleData         Json?
-  status             LeadStatus   @default(NEW)
-  notes              String?
   firstSeenAt        DateTime     @default(now())
   lastSeenAt         DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
-  firstSearchId      Int?
-  firstSearch        Search?      @relation(fields: [firstSearchId], references: [id])
+  users              UserLead[]
   searchResults      SearchLead[]
 
   @@index([siteStatus])
-  @@index([status])
-  @@index([city, category])
+}
+
+/// Empresa na lista de um usuário. Os campos daqui são só dele e nunca são sobrescritos por uma busca.
+model UserLead {
+  userId             Int
+  leadId             String
+  status             LeadStatus @default(NEW)
+  notes              String?
+  /// Cidade da busca que trouxe a empresa para o usuário pela primeira vez.
+  city               String
+  /// Categoria dessa mesma busca.
+  category           String
+  /// Bairro dessa mesma busca.
+  searchNeighborhood String?
+  firstSearchId      Int?
+  /// Quando a empresa entrou na lista do usuário.
+  firstSeenAt        DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  user               User       @relation(fields: [userId], references: [id])
+  lead               Lead       @relation(fields: [leadId], references: [id])
+  firstSearch        Search?    @relation(fields: [firstSearchId], references: [id])
+
+  @@id([userId, leadId])
+  @@index([leadId])
+  @@index([userId, status])
+  @@index([userId, city, category])
 }
 
 /// Empresas que cada busca trouxe. Um lead aparece aqui uma vez por busca que o encontrou.
@@ -145,11 +178,33 @@ model SearchLead {
 
 /// Quem pode usar o app. Só é criado pelo terminal (`bun run user:create`); não há cadastro pela API.
 model User {
-  id           Int      @id @default(autoincrement())
+  id               Int          @id @default(autoincrement())
   /// Sempre em minúsculas.
-  email        String   @unique
+  email            String       @unique
   /// "salt:hash" do scrypt, em hexadecimal. A senha nunca é guardada.
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  passwordHash     String
+  /// `ADMIN` também vê o painel com os usuários, as empresas e as entradas de cada um.
+  role             UserRole     @default(USER)
+  /// Chave da API do Google, cifrada com AES-256-GCM (`ENCRYPTION_KEY`). Nunca volta para o front.
+  googleApiKey     String?
+  /// HMAC-SHA256 da chave: impede a mesma chave em duas contas e conta o uso do mês por chave.
+  googleApiKeyHash String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  searches         Search[]
+  apiRequests      ApiRequest[]
+  leads            UserLead[]
+  accesses         UserAccess[]
+}
+
+/// Uma entrada do usuário no app. Aberturas com menos de 30 minutos de intervalo contam como a mesma entrada.
+model UserAccess {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  startedAt  DateTime @default(now())
+  /// Última abertura do app dentro dessa entrada.
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, startedAt])
 }

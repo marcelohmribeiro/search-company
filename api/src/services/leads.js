@@ -2,27 +2,48 @@ import { prisma } from "./prisma.js";
 
 // O objeto completo do Google pesa alguns KB por lead e não é usado na listagem.
 const OMIT_GOOGLE_DATA = { googleData: true };
+const WITH_LEAD = { lead: { omit: OMIT_GOOGLE_DATA } };
 
+// O `leadId` no fim desempata: sem ele, empresas com a mesma nota ou a mesma data podem trocar de lugar
+// entre uma consulta e outra e aparecer em duas páginas, ou em nenhuma.
 const ORDER_BY = {
-	reviews: [{ userRatingCount: { sort: "desc", nulls: "last" } }, { rating: { sort: "desc", nulls: "last" } }],
-	rating: [{ rating: { sort: "desc", nulls: "last" } }, { userRatingCount: { sort: "desc", nulls: "last" } }],
-	name: [{ name: "asc" }],
-	recent: [{ firstSeenAt: "desc" }],
+	reviews: [
+		{ lead: { userRatingCount: { sort: "desc", nulls: "last" } } },
+		{ lead: { rating: { sort: "desc", nulls: "last" } } },
+		{ leadId: "asc" },
+	],
+	rating: [
+		{ lead: { rating: { sort: "desc", nulls: "last" } } },
+		{ lead: { userRatingCount: { sort: "desc", nulls: "last" } } },
+		{ leadId: "asc" },
+	],
+	name: [{ lead: { name: "asc" } }, { leadId: "asc" }],
+	recent: [{ firstSeenAt: "desc" }, { leadId: "asc" }],
 };
 
-function buildWhere(filters) {
-	const where = {};
-	if (filters.siteStatus?.length) where.siteStatus = { in: filters.siteStatus };
+/**
+ * Lead como o front recebe: os dados do Google com o acompanhamento e a busca de origem do usuário.
+ * `firstSeenAt` é quando a empresa entrou na lista dele.
+ */
+function toUserLead({ lead, userId, leadId, firstSearchId, ...tracking }) {
+	return { ...lead, ...tracking };
+}
+
+function buildWhere(userId, filters) {
+	const lead = {};
+	if (filters.siteStatus?.length) lead.siteStatus = { in: filters.siteStatus };
+	if (filters.businessStatus?.length) lead.businessStatus = { in: filters.businessStatus };
+	if (filters.minRating != null) lead.rating = { gte: filters.minRating };
+	if (filters.minReviews != null) lead.userRatingCount = { gte: filters.minReviews };
+	if (filters.q) lead.name = { contains: filters.q, mode: "insensitive" };
+
+	const where = { userId, lead };
 	if (filters.status?.length) where.status = { in: filters.status };
-	if (filters.businessStatus?.length) where.businessStatus = { in: filters.businessStatus };
-	if (filters.minRating != null) where.rating = { gte: filters.minRating };
-	if (filters.minReviews != null) where.userRatingCount = { gte: filters.minReviews };
 	if (filters.city) where.city = { equals: filters.city, mode: "insensitive" };
 	if (filters.category) where.category = { equals: filters.category, mode: "insensitive" };
-	if (filters.q) where.name = { contains: filters.q, mode: "insensitive" };
 	if (filters.neighborhood) {
 		where.OR = [
-			{ neighborhood: { equals: filters.neighborhood, mode: "insensitive" } },
+			{ lead: { neighborhood: { equals: filters.neighborhood, mode: "insensitive" } } },
 			{ searchNeighborhood: { equals: filters.neighborhood, mode: "insensitive" } },
 		];
 	}
@@ -30,48 +51,55 @@ function buildWhere(filters) {
 }
 
 /**
- * Página de leads que atendem aos filtros.
+ * Página de leads do usuário que atendem aos filtros.
  * @returns {Promise<{ items: object[], total: number, page: number, pageSize: number }>}
  */
-async function listLeads(filters, { page, pageSize, orderBy }) {
-	const where = buildWhere(filters);
-	const [items, total] = await prisma.$transaction([
-		prisma.lead.findMany({
+async function listLeads(userId, filters, { page, pageSize, orderBy }) {
+	const where = buildWhere(userId, filters);
+	const [rows, total] = await prisma.$transaction([
+		prisma.userLead.findMany({
 			where,
-			omit: OMIT_GOOGLE_DATA,
+			include: WITH_LEAD,
 			orderBy: ORDER_BY[orderBy] ?? ORDER_BY.reviews,
 			skip: (page - 1) * pageSize,
 			take: pageSize,
 		}),
-		prisma.lead.count({ where }),
+		prisma.userLead.count({ where }),
 	]);
-	return { items, total, page, pageSize };
+	return { items: rows.map(toUserLead), total, page, pageSize };
 }
 
 /**
- * Valores distintos de cidade, categoria e bairro já gravados, em ordem alfabética.
+ * Valores distintos de cidade, categoria e bairro nos leads do usuário, em ordem alfabética.
  * O bairro junta o bairro do Google e o bairro das buscas.
  */
-async function getLeadFilterOptions() {
-	const rows = await prisma.lead.findMany({
-		select: { city: true, category: true, neighborhood: true, searchNeighborhood: true },
-		distinct: ["city", "category", "neighborhood", "searchNeighborhood"],
+async function getLeadFilterOptions(userId) {
+	const rows = await prisma.userLead.findMany({
+		where: { userId },
+		select: { city: true, category: true, searchNeighborhood: true, lead: { select: { neighborhood: true } } },
 	});
 	const sorted = (values) => [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
 	return {
 		cities: sorted(rows.map((row) => row.city)),
 		categories: sorted(rows.map((row) => row.category)),
-		neighborhoods: sorted(rows.flatMap((row) => [row.neighborhood, row.searchNeighborhood])),
+		neighborhoods: sorted(rows.flatMap((row) => [row.lead.neighborhood, row.searchNeighborhood])),
 	};
 }
 
 /**
- * Atualiza só os campos de acompanhamento do lead.
+ * Atualiza só os campos de acompanhamento do lead na lista do usuário.
+ * @param {number} userId
  * @param {string} id `places.id`.
  * @param {{ status?: string, notes?: string | null }} data
+ * @throws 404 (P2025) se a empresa não está na lista do usuário.
  */
-async function updateLead(id, data) {
-	return prisma.lead.update({ where: { id }, data, omit: OMIT_GOOGLE_DATA });
+async function updateLead(userId, id, data) {
+	const row = await prisma.userLead.update({
+		where: { userId_leadId: { userId, leadId: id } },
+		data,
+		include: WITH_LEAD,
+	});
+	return toUserLead(row);
 }
 
 export { listLeads, getLeadFilterOptions, updateLead };
