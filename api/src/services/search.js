@@ -1,13 +1,15 @@
 import { prisma } from "./prisma.js";
 import { searchText } from "./places.js";
 import { getUsage, reserveRequest, finishRequest } from "./usage.js";
+import { getGoogleApiKey } from "./users.js";
 import { settings } from "#src/config";
 import { classifySite, httpError } from "#src/utils";
 
 const NEIGHBORHOOD_TYPES = ["sublocality_level_1", "sublocality", "neighborhood"];
 
-let searchRunning = false;
-let lastRequestAt = 0;
+// Por usuário: cada um busca com a própria chave, que tem a própria cota por minuto no console do Google.
+const runningSearches = new Set();
+const lastRequestAt = new Map();
 
 /**
  * Texto enviado à Text Search: "<categoria> em <bairro>, <cidade>", ou "<categoria> em <cidade>" sem bairro.
@@ -18,11 +20,11 @@ function buildTextQuery({ category, neighborhood, city }) {
 
 // Espaça as chamadas para não estourar a cota por minuto do console. Um 429 do Google
 // também conta no limite mensal, já que a requisição foi reservada.
-async function waitForRateLimit() {
+async function waitForRateLimit(userId) {
 	const interval = Math.ceil(60_000 / settings.REQUESTS_PER_MINUTE) + 200;
-	const wait = lastRequestAt + interval - Date.now();
+	const wait = (lastRequestAt.get(userId) ?? 0) + interval - Date.now();
 	if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-	lastRequestAt = Date.now();
+	lastRequestAt.set(userId, Date.now());
 }
 
 function findNeighborhood(addressComponents = []) {
@@ -65,13 +67,14 @@ function toLeadData(place) {
 }
 
 /**
- * Grava os lugares como leads, deduplicando pelo `places.id`, e registra em `SearchLead` que a busca
- * os trouxe. Lugares já conhecidos têm os dados do Google atualizados, mas mantêm status, anotações e
- * a busca de origem. Todos os lugares com `id` são gravados, inclusive os fechados.
+ * Grava os lugares como leads, deduplicando pelo `places.id`, coloca-os na lista do dono da busca e registra
+ * em `SearchLead` que a busca os trouxe. Um lugar que já existe, trazido por qualquer usuário, tem os dados do
+ * Google atualizados; na lista de quem já o tinha, mantém status, anotações e a busca de origem.
+ * Todos os lugares com `id` são gravados, inclusive os fechados.
  * @param {object[]} places `places` da resposta da Text Search.
  * @param {object} search Busca que trouxe os lugares.
  * @param {number} page Página da busca em que os lugares vieram.
- * @returns {Promise<number>} Quantidade de leads novos.
+ * @returns {Promise<number>} Quantidade de leads novos na lista do usuário.
  */
 async function saveLeads(places, search, page) {
 	// Um lugar sem `id` não vira lead, mas continua na resposta guardada em `ApiRequest.response`.
@@ -79,25 +82,13 @@ async function saveLeads(places, search, page) {
 	const ids = [...new Set(withId.map((place) => place.id))];
 	if (!ids.length) return 0;
 
-	const existing = await prisma.lead.findMany({ where: { id: { in: ids } }, select: { id: true } });
-	const known = new Set(existing.map((lead) => lead.id));
 	const now = new Date();
-
-	await prisma.$transaction([
+	const results = await prisma.$transaction([
 		...withId.map((place) => {
 			const data = toLeadData(place);
 			return prisma.lead.upsert({
 				where: { id: place.id },
-				create: {
-					id: place.id,
-					...data,
-					city: search.city,
-					category: search.category,
-					searchNeighborhood: search.neighborhood,
-					firstSearchId: search.id,
-					firstSeenAt: now,
-					lastSeenAt: now,
-				},
+				create: { id: place.id, ...data, firstSeenAt: now, lastSeenAt: now },
 				update: { ...data, lastSeenAt: now },
 			});
 		}),
@@ -105,9 +96,21 @@ async function saveLeads(places, search, page) {
 			data: ids.map((leadId) => ({ searchId: search.id, leadId, page, createdAt: now })),
 			skipDuplicates: true,
 		}),
+		prisma.userLead.createMany({
+			data: ids.map((leadId) => ({
+				userId: search.userId,
+				leadId,
+				city: search.city,
+				category: search.category,
+				searchNeighborhood: search.neighborhood,
+				firstSearchId: search.id,
+				firstSeenAt: now,
+			})),
+			skipDuplicates: true,
+		}),
 	]);
 
-	return ids.filter((id) => !known.has(id)).length;
+	return results.at(-1).count;
 }
 
 function describeGoogleError(result) {
@@ -116,12 +119,13 @@ function describeGoogleError(result) {
 }
 
 /**
- * Busca mais recente com o mesmo texto que terminou e cobre ao menos `maxPages` páginas
+ * Busca mais recente do usuário com o mesmo texto que terminou e cobre ao menos `maxPages` páginas
  * (ou todas as que existiam).
  */
-async function findCompletedSearch(textQuery, maxPages) {
+async function findCompletedSearch(userId, textQuery, maxPages) {
 	return prisma.search.findFirst({
 		where: {
+			userId,
 			textQuery: { equals: textQuery, mode: "insensitive" },
 			status: "DONE",
 			OR: [{ exhausted: true }, { pagesFetched: { gte: maxPages } }],
@@ -137,9 +141,9 @@ async function findCompletedSearch(textQuery, maxPages) {
  * @throws Erro 429 com o limite do mês atingido, sem chamar o Google. Erro 502 com a mensagem do Google ou
  * da rede quando a chamada falha; nesse caso, a requisição já conta no mês.
  */
-async function fetchPage({ searchId, page, textQuery, pageToken, apiKey }) {
-	await waitForRateLimit();
-	const request = await reserveRequest({ searchId, page });
+async function fetchPage({ searchId, page, textQuery, pageToken, userId, apiKey, keyHash }) {
+	await waitForRateLimit(userId);
+	const request = await reserveRequest({ searchId, page, userId, keyHash });
 
 	let result;
 	try {
@@ -166,37 +170,39 @@ async function fetchPage({ searchId, page, textQuery, pageToken, apiKey }) {
 }
 
 /**
- * Roda uma busca (uma combinação categoria × bairro × cidade) na Places API, página por página,
- * e grava os leads de cada página no banco. A busca para no limite do mês, no primeiro erro ou quando
- * não há próxima página. Não há nova tentativa.
+ * Roda uma busca do usuário (uma combinação categoria × bairro × cidade) na Places API, com a chave do Google
+ * salva por ele, página por página, e grava os leads de cada página no banco. A busca para no limite do mês,
+ * no primeiro erro ou quando não há próxima página. Não há nova tentativa.
+ * @param {number} userId
  * @param {{ city: string, category: string, neighborhood?: string, maxPages: number, skipIfDone: boolean }} input
- * @param {string} apiKey Chave da API do Google enviada pelo cliente. Só é repassada ao Google: não vai para o
- * banco nem para o log.
  * @returns {Promise<{ skipped: boolean, search: object, usage: object }>} Com `skipped`, `search` é a
- * busca anterior e nenhuma requisição é feita.
- * @throws 409 com outra busca em andamento, 429 com o limite do mês atingido.
+ * busca anterior do usuário e nenhuma requisição é feita.
+ * @throws 400 sem chave do Google salva, 409 com outra busca do usuário em andamento, 429 com o limite do mês
+ * atingido.
  */
-async function runSearch({ city, category, neighborhood, maxPages, skipIfDone }, apiKey) {
-	if (searchRunning) {
-		throw httpError(409, "Já existe uma busca em andamento.");
+async function runSearch(userId, { city, category, neighborhood, maxPages, skipIfDone }) {
+	const { apiKey, keyHash } = await getGoogleApiKey(userId);
+
+	if (runningSearches.has(userId)) {
+		throw httpError(409, "Você já tem uma busca em andamento.");
 	}
 
-	searchRunning = true;
+	runningSearches.add(userId);
 	try {
 		const textQuery = buildTextQuery({ category, neighborhood, city });
 
 		if (skipIfDone) {
-			const previous = await findCompletedSearch(textQuery, maxPages);
-			if (previous) return { skipped: true, search: previous, usage: await getUsage() };
+			const previous = await findCompletedSearch(userId, textQuery, maxPages);
+			if (previous) return { skipped: true, search: previous, usage: await getUsage(userId) };
 		}
 
-		const usage = await getUsage();
+		const usage = await getUsage(userId);
 		if (usage.remaining <= 0) {
 			throw httpError(429, `Limite de ${usage.limit} requisições do mês ${usage.period} atingido.`);
 		}
 
 		const search = await prisma.search.create({
-			data: { city, category, neighborhood, textQuery, maxPages },
+			data: { city, category, neighborhood, textQuery, maxPages, userId },
 		});
 
 		const totals = { pagesFetched: 0, resultsCount: 0, newLeadsCount: 0 };
@@ -206,7 +212,15 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 
 		try {
 			for (let page = 1; page <= maxPages; page++) {
-				const { places, nextPageToken } = await fetchPage({ searchId: search.id, page, textQuery, pageToken, apiKey });
+				const { places, nextPageToken } = await fetchPage({
+					searchId: search.id,
+					page,
+					textQuery,
+					pageToken,
+					userId,
+					apiKey,
+					keyHash,
+				});
 				totals.pagesFetched++;
 				totals.resultsCount += places.length;
 				totals.newLeadsCount += await saveLeads(places, search, page);
@@ -232,18 +246,19 @@ async function runSearch({ city, category, neighborhood, maxPages, skipIfDone },
 			},
 		});
 
-		return { skipped: false, search: finished, usage: await getUsage() };
+		return { skipped: false, search: finished, usage: await getUsage(userId) };
 	} finally {
-		searchRunning = false;
+		runningSearches.delete(userId);
 	}
 }
 
 /**
- * Buscas mais recentes primeiro.
+ * Buscas do usuário, as mais recentes primeiro.
+ * @param {number} userId
  * @param {number} [take]
  */
-async function listSearches(take = 100) {
-	return prisma.search.findMany({ orderBy: { createdAt: "desc" }, take });
+async function listSearches(userId, take = 100) {
+	return prisma.search.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take });
 }
 
 export { runSearch, listSearches };

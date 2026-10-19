@@ -1,5 +1,7 @@
 // Cadastra um usuário do app, ou troca a senha de um e-mail que já existe.
-// Uso: bun run user:create [email]
+// Uso: bun run user:create [email] [--admin]
+// Com --admin, o usuário criado (ou o existente) vira administrador; sem a opção, um usuário novo é comum e um
+// existente mantém o papel.
 // A senha é pedida no terminal sem aparecer na tela; com a entrada redirecionada, é lida da primeira linha.
 import { createInterface } from "node:readline/promises";
 import { settings } from "#src/config";
@@ -56,14 +58,21 @@ async function readPassword() {
 async function main() {
 	console.log(`Banco: ${new URL(settings.DATABASE_URL).host}`);
 
-	const email = process.argv[2] ?? (await ask("E-mail: "));
+	const args = process.argv.slice(2);
+	const role = args.includes("--admin") ? "ADMIN" : undefined;
+	const email = args.find((arg) => !arg.startsWith("--")) ?? (await ask("E-mail: "));
 	const password = await readPassword();
 
 	const parsed = userSchema.safeParse({ email, password });
 	if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
-	const { user, created } = await saveUser(parsed.data);
-	console.log(created ? `Usuário criado: ${user.email} (id ${user.id}).` : `Senha atualizada para ${user.email}.`);
+	const { user, created } = await saveUser({ ...parsed.data, role });
+	const roleLabel = user.role === "ADMIN" ? "administrador" : "usuário comum";
+	console.log(
+		created
+			? `Usuário criado: ${user.email} (id ${user.id}, ${roleLabel}).`
+			: `Senha atualizada para ${user.email} (${roleLabel}).`,
+	);
 }
 
 try {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CircleAlert, Eye, EyeOff, KeyRound, MapPin, Search, Square, TriangleAlert } from 'lucide-react'
+import { CircleAlert, KeyRound, MapPin, Search, Square, TriangleAlert } from 'lucide-react'
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -12,18 +12,17 @@ import {
 } from 'src/components/ui/alert-dialog'
 import { Badge } from 'src/components/ui/badge'
 import { Button } from 'src/components/ui/button'
+import GoogleApiKeyField from 'src/components/search/GoogleApiKeyField'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from 'src/components/ui/card'
-import { Checkbox } from 'src/components/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from 'src/components/ui/field'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from 'src/components/ui/input-group'
-import { Label } from 'src/components/ui/label'
+import { InputGroup, InputGroupAddon, InputGroupInput } from 'src/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
 import { Spinner } from 'src/components/ui/spinner'
 import { Switch } from 'src/components/ui/switch'
 import { Textarea } from 'src/components/ui/textarea'
 import { formatNumber, plural } from 'src/lib/format'
 import { parseList, textQuery } from 'src/lib/search'
-import { useApiKeyStore } from 'src/store/apiKeyStore'
+import { useAuthStore } from 'src/store/authStore'
 import { useUsageStore } from 'src/store/usageStore'
 import type { SearchCombo, SearchRequest } from 'src/types'
 
@@ -57,8 +56,7 @@ function ParsedItems({ items }: { items: string[] }) {
 
 export default function SearchForm({ running, stopping, onRun, onStop }: SearchFormProps) {
 	const usage = useUsageStore((state) => state.usage)
-	const { apiKey, remember, setApiKey, setRemember } = useApiKeyStore()
-	const [showKey, setShowKey] = useState(false)
+	const hasApiKey = useAuthStore((state) => state.user?.hasGoogleApiKey === true)
 	const [city, setCity] = useState('')
 	const [categoriesText, setCategoriesText] = useState('')
 	const [neighborhoodsText, setNeighborhoodsText] = useState('')
@@ -79,12 +77,11 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 	const cityName = city.trim().replace(/\s+/g, ' ')
 	const estimate = combos.length * maxPages
 	const remaining = usage?.remaining ?? 0
-	const hasApiKey = apiKey.trim() !== ''
 	const canRun = !running && hasApiKey && cityName !== '' && combos.length > 0 && remaining > 0
 
 	function confirm() {
 		setConfirmOpen(false)
-		onRun({ apiKey: apiKey.trim(), city: cityName, combos, maxPages, skipIfDone })
+		onRun({ city: cityName, combos, maxPages, skipIfDone })
 	}
 
 	return (
@@ -96,44 +93,7 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 
 			<CardContent>
 				<FieldGroup>
-					<Field data-disabled={running}>
-						<FieldLabel htmlFor='api-key'>Chave da API do Google</FieldLabel>
-						<InputGroup>
-							<InputGroupAddon>
-								<KeyRound />
-							</InputGroupAddon>
-							<InputGroupInput
-								id='api-key'
-								type={showKey ? 'text' : 'password'}
-								value={apiKey}
-								onChange={(event) => setApiKey(event.target.value)}
-								placeholder='AIza…'
-								autoComplete='off'
-								spellCheck={false}
-								disabled={running}
-							/>
-							<InputGroupAddon align='inline-end'>
-								<InputGroupButton
-									size='icon-xs'
-									onClick={() => setShowKey((current) => !current)}
-									aria-label={showKey ? 'Esconder a chave' : 'Mostrar a chave'}
-								>
-									{showKey ? <EyeOff /> : <Eye />}
-								</InputGroupButton>
-							</InputGroupAddon>
-						</InputGroup>
-						<div className='flex items-center gap-2'>
-							<Checkbox
-								id='remember-api-key'
-								checked={remember}
-								onCheckedChange={(checked) => setRemember(checked === true)}
-								disabled={running}
-							/>
-							<Label htmlFor='remember-api-key' className='font-normal'>
-								Lembrar neste navegador
-							</Label>
-						</div>
-					</Field>
+					<GoogleApiKeyField disabled={running} />
 
 					<FieldSeparator />
 
@@ -223,7 +183,7 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 					{!hasApiKey && (
 						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700'>
 							<KeyRound className='size-3.5' />
-							Informe a chave da API do Google para buscar.
+							Salve a chave da API do Google para buscar.
 						</p>
 					)}
 					{usage && remaining === 0 && (

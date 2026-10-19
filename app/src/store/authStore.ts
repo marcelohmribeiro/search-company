@@ -7,6 +7,8 @@ interface AuthState {
 	token: string | null
 	user: AuthUser | null
 	signIn: (token: string, user: AuthUser) => void
+	/** Troca os dados do usuário (papel, chave do Google) pelos mais recentes da API. */
+	setUser: (user: AuthUser) => void
 	/** Apaga a sessão; as rotas protegidas voltam para o login. */
 	signOut: () => void
 }
@@ -17,6 +19,7 @@ const useAuthStore = create<AuthState>()(
 			token: null,
 			user: null,
 			signIn: (token, user) => set({ token, user }),
+			setUser: (user) => set({ user }),
 			signOut: () => set({ token: null, user: null }),
 		}),
 		{

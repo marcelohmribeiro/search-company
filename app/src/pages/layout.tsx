@@ -1,10 +1,12 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { LogOut, MapPinned, Search, Users } from 'lucide-react'
+import { LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
 import UsageMeter from 'src/components/UsageMeter'
 import { Button } from 'src/components/ui/button'
 import { Toaster } from 'src/components/ui/sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from 'src/components/ui/tooltip'
 import { cn } from 'src/lib/utils'
+import { fetchMe } from 'src/services'
 import { useAuthStore } from 'src/store/authStore'
 import { useLeadsViewStore } from 'src/store/leadsViewStore'
 
@@ -13,9 +15,20 @@ const NAV_ITEMS = [
 	{ to: '/leads', label: 'Leads', icon: Users, end: false },
 ]
 
+const ADMIN_NAV_ITEM = { to: '/admin', label: 'Admin', icon: ShieldCheck, end: false }
+
 export default function Layout() {
 	const leadsSearch = useLeadsViewStore((state) => state.search)
-	const { user, signOut } = useAuthStore()
+	const { user, signOut, setUser } = useAuthStore()
+	const navItems = user?.role === 'ADMIN' ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS
+
+	// Ao abrir o app: traz papel e chave do Google atualizados e registra a entrada (o painel admin mostra).
+	// Um 401 aqui já encerra a sessão pelo interceptor; outros erros não impedem o uso.
+	useEffect(() => {
+		fetchMe()
+			.then(setUser)
+			.catch(() => {})
+	}, [setUser])
 
 	return (
 		<TooltipProvider>
@@ -30,7 +43,7 @@ export default function Layout() {
 						</div>
 
 						<nav className='flex items-center gap-1'>
-							{NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+							{navItems.map(({ to, label, icon: Icon, end }) => (
 								<NavLink
 									key={to}
 									to={to === '/leads' ? `/leads${leadsSearch}` : to}

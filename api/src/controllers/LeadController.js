@@ -5,7 +5,7 @@ const LeadController = () => {
   async function findAll(req, res, next) {
     try {
       const { page, pageSize, orderBy, ...filters } = leadQuerySchema.parse(req.query);
-      const data = await listLeads(filters, { page, pageSize, orderBy });
+      const data = await listLeads(req.user.id, filters, { page, pageSize, orderBy });
 
       return res.status(200).json(data);
     } catch (error) {
@@ -15,7 +15,7 @@ const LeadController = () => {
 
   async function filterOptions(req, res, next) {
     try {
-      const data = await getLeadFilterOptions();
+      const data = await getLeadFilterOptions(req.user.id);
 
       return res.status(200).json(data);
     } catch (error) {
@@ -25,7 +25,7 @@ const LeadController = () => {
 
   async function update(req, res, next) {
     try {
-      const data = await updateLead(req.params.id, leadUpdateSchema.parse(req.body ?? {}));
+      const data = await updateLead(req.user.id, req.params.id, leadUpdateSchema.parse(req.body ?? {}));
 
       return res.status(200).json(data);
     } catch (error) {

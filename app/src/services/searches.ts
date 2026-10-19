@@ -2,11 +2,11 @@ import { api } from './_api'
 import type { Search, SearchInput, SearchResult } from 'src/types'
 
 /**
- * Roda uma busca no backend. Pode gastar até `maxPages` requisições da cota do mês.
- * `apiKey` vai no header `X-Google-Api-Key`, fora do corpo e da URL, e o backend só a repassa ao Google.
+ * Roda uma busca no backend, com a chave do Google salva na conta. Pode gastar até `maxPages` requisições
+ * da cota do mês.
  */
-export async function runSearch(input: SearchInput, apiKey: string) {
-	const { data } = await api.post<SearchResult>('/searches', input, { headers: { 'X-Google-Api-Key': apiKey } })
+export async function runSearch(input: SearchInput) {
+	const { data } = await api.post<SearchResult>('/searches', input)
 	return data
 }
 
