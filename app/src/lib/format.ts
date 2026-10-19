@@ -1,9 +1,17 @@
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
+const timeFormatter = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' })
 const numberFormatter = new Intl.NumberFormat('pt-BR')
 const ratingFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /** "16/10/2026, 18:30" a partir de uma data ISO. */
 export const formatDateTime = (iso: string) => dateTimeFormatter.format(new Date(iso))
+
+/** "16/10/2026" a partir de uma data ISO. */
+export const formatDate = (iso: string) => dateFormatter.format(new Date(iso))
+
+/** "18:30" a partir de uma data ISO. */
+export const formatTime = (iso: string) => timeFormatter.format(new Date(iso))
 
 /** Número com separador de milhar ("1.234"). */
 export const formatNumber = (value: number) => numberFormatter.format(value)

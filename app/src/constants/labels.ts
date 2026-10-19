@@ -1,4 +1,4 @@
-import type { BusinessStatus, LeadOrder, LeadStatus, SearchStatus, SiteStatus } from 'src/types'
+import type { BusinessStatus, LeadOrder, LeadStatus, SearchStatus, SiteStatus, UserRole } from 'src/types'
 
 interface Option<T> {
 	value: T
@@ -65,3 +65,11 @@ export const businessStatusLabel = (value: BusinessStatus | null) =>
 
 export const siteStatusOption = (value: SiteStatus) =>
 	SITE_STATUS_OPTIONS.find((option) => option.value === value) ?? SITE_STATUS_OPTIONS[5]
+
+export const leadStatusOption = (value: LeadStatus) =>
+	LEAD_STATUS_OPTIONS.find((option) => option.value === value) ?? LEAD_STATUS_OPTIONS[0]
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+	ADMIN: 'Administrador',
+	USER: 'Usuário',
+}

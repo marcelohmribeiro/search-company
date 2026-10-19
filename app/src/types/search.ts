@@ -55,7 +55,6 @@ export interface SearchComboProgress extends SearchCombo {
 
 /** O que o formulário de busca envia para execução. */
 export interface SearchRequest {
-	apiKey: string
 	city: string
 	combos: SearchCombo[]
 	maxPages: number
