@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/c
 import { Field, FieldGroup, FieldLabel } from 'src/components/ui/field'
 import { Input } from 'src/components/ui/input'
 import { Spinner } from 'src/components/ui/spinner'
+import { isTokenActive } from 'src/lib/token'
 import { getErrorMessage, login } from 'src/services'
 import { useAuthStore } from 'src/store/authStore'
 
@@ -23,7 +24,7 @@ export default function Login() {
 	const [submitting, setSubmitting] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
-	if (token) return <Navigate to={safeNext(searchParams.get('next'))} replace />
+	if (isTokenActive(token)) return <Navigate to={safeNext(searchParams.get('next'))} replace />
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault()
