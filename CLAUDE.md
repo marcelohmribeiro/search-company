@@ -1,0 +1,339 @@
+# Search Company
+
+Aplicação **local** para encontrar empresas no Google Maps que **ainda não têm site** e oferecer a criação de um. Ela busca empresas pela Google Places API (New), classifica a situação do site de cada uma e acompanha os leads até o fechamento.
+
+A cidade é **livre**: o usuário informa na interface a cidade, as categorias e os bairros de cada busca. Nada no código deve assumir uma cidade fixa.
+
+## Regra nº 1: nunca passar de 990 requisições no mês
+
+A conta tem **1.000 requisições grátis por mês** de Text Search Enterprise. Passar disso gera cobrança no cartão.
+
+- **Nunca faça uma requisição real à Places API sem autorização explícita do usuário.** Isso vale para qualquer chamada: teste "grátis" (só IDs), `curl`, script ou o próprio app. Para testar, use o mock (ver "Testes").
+- **Cada usuário salva a própria chave da API do Google**, na tela de busca. Ela fica na conta dele, no banco (`User.googleApiKey`), e vale para todas as buscas dele.
+  - A chave é gravada **cifrada** com AES-256-GCM, usando o `ENCRYPTION_KEY` do `.env` (`src/utils/_secret.js`). Quem vê só o banco (painel do Supabase, dump, `DATABASE_URL` vazada) não consegue usá-la.
+  - Ela nunca volta para o front: a API só diz se existe e os 4 últimos caracteres. Também não vai para o log.
+  - `User.googleApiKeyHash` (SHA-256) impede a mesma chave em duas contas.
+  - **Nunca leia, imprima ou peça a chave real**: nem decifrando a do banco, nem da linha `GOOGLE_API_KEY` que possa ter sobrado no `api/.env`, que não é mais usada.
+- **Cada usuário tem os próprios 990 por mês.** A trava é **rígida em 990**: com 990 requisições usadas no mês, o backend recusa novas buscas desse usuário até virar o mês.
+  - O teto fica em `HARD_REQUEST_LIMIT`, em `api/src/config/settings.js`.
+  - O `MONTHLY_REQUEST_LIMIT` do `.env` só consegue baixar esse valor.
+
+Como a trava funciona (`api/src/services/usage.js` e `search.js`):
+
+- **O contador fica no banco.** Cada chamada HTTP à Places API vira uma linha em `ApiRequest`, com o usuário e o hash da chave usada.
+  - O uso do mês de um usuário conta as linhas dele **e** as feitas com a chave atual dele, por qualquer conta. Assim, trocar de chave ou passar uma chave para outra conta não zera o uso.
+  - As requisições de antes das contas (sem `keyHash`) contam pelo `userId`.
+- **A linha é criada antes da chamada.** `reserveRequest` cria a linha antes de a requisição sair. Depois, `finishRequest` grava o resultado. A linha conta mesmo que a chamada falhe ou o processo caia no meio.
+- **Cada página é uma requisição.** Uma busca de 3 páginas gasta 3, e o limite é conferido antes de **cada** página.
+- **Conferência e registro são atômicos.** A contagem e a criação rodam numa transação com `pg_advisory_xact_lock`. Além disso, cada usuário roda **uma busca por vez**: uma segunda busca simultânea dele recebe 409.
+- **O mês é o do Google.** A cota grátis volta à meia-noite do dia 1 no horário do Pacífico, então o mês é calculado no fuso `America/Los_Angeles` (ex.: `2026-10`).
+- **Não há retry automático.** A busca para no primeiro erro, e o front para a fila inteira.
+- **As chamadas de cada usuário são espaçadas** conforme `REQUESTS_PER_MINUTE` (padrão 10), que deve bater com a cota por minuto configurada no console.
+- **Só `searchText` chama a API** (`api/src/services/places.js`), e só depois de `reserveRequest`. Qualquer uso da chave fora do backend fica fora da conta.
+
+## Google Places API (New): o que usamos
+
+O sistema usa a API oficial, sem scraping do Maps, que vai contra os termos do Google.
+
+### Text Search (New)
+
+```
+POST https://places.googleapis.com/v1/places:searchText
+Content-Type: application/json
+X-Goog-Api-Key: <chave salva pelo usuário, decifrada>
+X-Goog-FieldMask: <FIELD_MASK de api/src/services/places.js>
+
+{
+  "textQuery": "barbearia em Aldeota, Fortaleza",
+  "languageCode": "pt-BR",
+  "regionCode": "BR",
+  "pageSize": 20,
+  "includePureServiceAreaBusinesses": true,
+  "pageToken": "<nextPageToken da resposta anterior, a partir da 2ª página>"
+}
+```
+
+- O texto da busca é `"<categoria> em <bairro>, <cidade>"`, ou `"<categoria> em <cidade>"` sem bairro. Para cobrir uma cidade, as buscas são divididas em **categoria × bairro**.
+- `pageSize` vai até 20, e cada busca devolve no **máximo 60 resultados** (3 páginas).
+- Na paginação, **todos os parâmetros** precisam ser iguais aos da primeira chamada, exceto `pageSize` e `pageToken`. Qualquer diferença gera `INVALID_ARGUMENT`.
+- A mesma busca pode trazer resultados diferentes, e por isso a deduplicação é pelo `places.id`.
+- `includePureServiceAreaBusinesses: true` inclui empresas que atendem numa região sem ter endereço físico (eletricista, diarista etc.). Elas são ótimos leads.
+- A API também aceita `includedType` + `strictTypeFiltering` (tipos da Tabela A), `minRating`, `locationBias` e `locationRestriction` (só retângulo). Nenhum deles é usado por enquanto.
+- Todas as empresas que a API devolve são gravadas, inclusive as fechadas (`businessStatus`). Ver "Nenhum dado é descartado".
+
+### Field mask e preço
+
+O preço depende dos campos pedidos. **A requisição é cobrada pela faixa (SKU) mais cara entre os campos.** Valores de 10/2026:
+
+| SKU | Campos (exemplos) | Grátis por mês | Depois |
+|---|---|---|---|
+| Text Search Essentials (IDs Only) | `places.id`, `nextPageToken` | ilimitado | — |
+| Text Search Pro | `displayName`, `formattedAddress`, `addressComponents`, `primaryType`, `googleMapsUri`, `businessStatus` | 5.000 | US$ 32/1.000 |
+| **Text Search Enterprise** | `websiteUri`, `nationalPhoneNumber`, `internationalPhoneNumber`, `rating`, `userRatingCount`, `regularOpeningHours` | **1.000** | US$ 35/1.000 |
+| Text Search Enterprise + Atmosphere | `reviews`, `editorialSummary`, `generativeSummary`, `paymentOptions`… | 1.000 | US$ 40/1.000 |
+
+- Como precisamos de `websiteUri` e telefone, toda busca cai em **Enterprise**. Os campos Pro e Essentials vêm junto sem custo extra.
+- Mais campos **não** gastam mais requisições: cada chamada HTTP conta como 1, com qualquer quantidade de campos ou de resultados.
+- O field mask (`FIELD_MASK` em `api/src/services/places.js`) pede **todos** os campos Essentials, Pro e Enterprise da Text Search: 45 campos de `places` mais o `nextPageToken`. A lista foi conferida na página de SKUs e na referência do `Place`.
+  - **Nunca** use `*` nem inclua campos Enterprise + Atmosphere (`reviews`, `reviewSummary`, `editorialSummary`, `generativeSummary`, `paymentOptions`, `parkingOptions`, `delivery`, `takeout`, `dineIn`, `serves*`, `routingSummaries` etc.), porque eles mudam a faixa da requisição.
+  - `entrances`, `navigationPoints` e `searchUri` ficam de fora porque a documentação classifica esses campos de forma inconsistente.
+- `addressComponents` traz o bairro real da empresa. Uma busca "em Aldeota" pode trazer empresas de bairros vizinhos.
+- Em `photos` vêm só as referências das fotos. Baixar a imagem é outra chamada, da API de fotos (Place Photos), que tem SKU e cota próprios e não passa pela trava. A doc diz que essas referências podem expirar.
+- Desde 01/03/2025 não existe mais o crédito mensal de US$ 200. Cada SKU tem a própria cota grátis.
+
+### Termos de uso (armazenamento)
+
+- O `place_id` pode ser guardado sem restrição. O Google recomenda atualizar IDs com mais de 12 meses, o que é **gratuito**: basta um Place Details pedindo só o campo `id`.
+- Latitude e longitude só podem ficar em cache por até 30 dias.
+- **O restante do conteúdo** (nome, telefone, endereço, site, nota) **não pode ser armazenado** além das exceções dos termos. Ver "Decisões em aberto".
+- Ao exibir resultados fora de um mapa do Google, é obrigatório atribuir a fonte ao Google.
+
+### Links
+
+- Visão geral: https://developers.google.com/maps/documentation/places/web-service/op-overview
+- Text Search: https://developers.google.com/maps/documentation/places/web-service/text-search
+- Campos por SKU: https://developers.google.com/maps/documentation/places/web-service/data-fields
+- Preços: https://developers.google.com/maps/billing-and-pricing/pricing
+- Detalhes dos SKUs: https://developers.google.com/maps/billing-and-pricing/sku-details
+- Políticas: https://developers.google.com/maps/documentation/places/web-service/policies
+- Tipos de lugar (Tabela A): https://developers.google.com/maps/documentation/places/web-service/place-types
+
+## Repositório
+
+Monorepo `git@github.com-personal:marcelohmribeiro/search-company.git`:
+
+| Pasta | Stack |
+|---|---|
+| `api/` | Node 22 (ESM, JavaScript), Express 5, Prisma 7 + Postgres 17 (`@prisma/adapter-pg`), zod 4, dotenv, plop |
+| `app/` | React 19, Vite 6, Tailwind CSS v4, shadcn/ui (Radix, preset nova), lucide-react, sonner, React Router 7, Zustand, axios (TSX/TS) |
+
+### Como rodar
+
+```bash
+# api/
+bun install
+docker compose up -d --wait  # sobe o Postgres (api/docker-compose.yml) em localhost:5432
+bunx prisma migrate dev  # aplica as migrations
+bunx prisma generate     # no Prisma 7, o migrate não gera o client sozinho
+bun run dev              # node --watch server.js, em http://localhost:3333
+
+# app/
+bun install
+bun dev                  # http://localhost:5173
+bun run lint && bun run build
+```
+
+Depois de qualquer mudança no `schema.prisma`: `bunx prisma migrate dev --name <nome>` **no banco local** e depois `bunx prisma generate`.
+
+### Banco no Supabase
+
+O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois de 7 dias sem uso e sem backup automático. No projeto, o Data API está desligado e o RLS automático está ligado. O RLS não afeta a API, porque o Prisma conecta como `postgres`, que é dono das tabelas.
+
+- **String de conexão:** use a do **Session pooler** (porta 5432, funciona em IPv4) do botão Connect, com `?sslmode=require` no final, em `DATABASE_URL`. A mesma URL serve para a API e para as migrations.
+  - A conexão direta (`db.<ref>.supabase.co`) só funciona em IPv6 no plano grátis.
+  - O transaction pooler (6543) é para serverless.
+- **SSL** (`api/src/services/prisma.js`):
+  - O Prisma CLI entende `sslmode=require` como "criptografa".
+  - O `pg` da API trataria `require` como `verify-full` e recusaria a CA própria do Supabase. Por isso a API tira o `sslmode` da URL e monta o SSL sozinha.
+  - Com `sslmode` na URL, a conexão da API é criptografada sem validar o certificado, como no Prisma CLI.
+  - Não use `sslrootcert`/`sslcert` na URL: o `pg` e o Prisma interpretam esses parâmetros de formas diferentes.
+- **Migrations:** no Supabase, só `bun run migrate:deploy` (`prisma migrate deploy`). **Nunca rode `prisma migrate dev` no Supabase**: ele usa um banco sombra e pode propor resetar o banco, o que apagaria leads e o contador do mês.
+- **Dados:** em 17/10/2026, os dados do banco local foram copiados para o Supabase, incluindo o contador do mês. Desde então, o Postgres do Docker serve só para desenvolvimento e testes; não rode buscas reais nele.
+  - O container Docker não tem IPv6, e a conexão direta do Supabase (`db.<ref>.supabase.co`) só funciona em IPv6. Por isso, para copiar dados pelo terminal, rode o `pg_dump` no container e grave com o Node na máquina (pg_dump com `--inserts`, sem as linhas `\restrict`).
+  - Os bancos ordenam texto de jeitos diferentes: o Postgres Alpine local usa musl e o Supabase usa glibc. Ao comparar dados entre eles, ordene com `collate "C"`.
+- **Espaço:** o usuário decidiu manter todos os campos e as duas cópias dos dados do Google (~300 MB por mês no uso máximo). Acompanhe o tamanho na página Usage do Supabase.
+
+### Variáveis de ambiente
+
+- `api/.env`:
+  - `DATABASE_URL`: local, `postgresql://search:search@localhost:5432/search_company`; no Supabase, a URL do Session pooler com `?sslmode=require` (ver "Banco no Supabase").
+  - `PORT` (3333) e `FRONTEND_URL` (`http://localhost:5173`).
+  - `JWT_SECRET`: segredo que assina os tokens. **Obrigatório**: sem ele, a API não sobe. Na Vercel, cadastre o mesmo tipo de valor (um segredo longo e aleatório).
+  - `ENCRYPTION_KEY`: 64 caracteres hexadecimais que cifram as chaves do Google salvas. **Obrigatório**: sem ele, a API não sobe.
+    - Tem de ser **o mesmo** no `api/.env` e na Vercel, porque os dois usam o mesmo banco. Com outro valor, as chaves salvas não podem mais ser lidas, e cada usuário precisa salvar a dele de novo.
+    - Não confunda com a chave do Google: o nome é diferente de propósito.
+  - Opcionais: `MONTHLY_REQUEST_LIMIT` (só baixa o teto de 990), `REQUESTS_PER_MINUTE` (padrão 10) e `PLACES_API_URL` (para apontar a um mock).
+- `app/.env`: `VITE_APP_NAME` e `VITE_API_URL` (`http://localhost:3333`).
+- Os dois `.env` estão no `.gitignore`. A chave do Google não está em nenhum deles: cada usuário a salva na própria conta.
+
+### Convenções
+
+- **`api/`**
+  - Os imports internos usam o alias `#src/...` (definido em `package.json` → `imports`). Cada pasta tem um `index.js` que reexporta seus arquivos **por caminho relativo** (`./arquivo.js`). Importe sempre a pasta (`#src/services`), nunca `#src/<pasta>/<arquivo>.js`: na Vercel, o empacotamento não inclui arquivos importados nesse formato, e a função quebra com `ERR_MODULE_NOT_FOUND`.
+  - Controllers são fábricas (`XController()`) com `try/catch` e `next(error)`, no padrão de `plop/component/`. Ao gerar pelo plop, responda **sim** para `verifyJWT`: toda rota nova precisa de login.
+  - A entrada é validada com zod, em `src/schemas/`. Os controllers chamam `schema.parse(...)`. Quando a validação falha, o `handleError` devolve 400 com o primeiro problema, no formato `"campo": mensagem`. As mensagens saem em português pelo `z.locales.pt()`, configurado em `src/schemas/index.js`.
+  - Para responder com erro, lance `httpError(status, mensagem)`. O `handleError` (`src/utils/_handleError.js`) devolve `{ error }`.
+  - O servidor escuta **só em `127.0.0.1`**, e o Postgres expõe a porta só nesse endereço. Assim nenhum outro dispositivo da rede acessa os dois. O acesso à API exige login (ver "Autenticação").
+  - As URLs usam `localhost` (`http://localhost:3333`, `localhost:5432`), que aponta para esse mesmo endereço.
+  - O front precisa ser aberto exatamente em `http://localhost:5173`, a origem liberada no CORS pelo `FRONTEND_URL`. Para o navegador, `127.0.0.1:5173` é outra origem, e a API recusaria as chamadas.
+- **`app/`**
+  - O alias `src/` aponta para `app/src`.
+  - As chamadas à API ficam em `src/services/`, os tipos em `src/types/` e os rótulos em português em `src/constants/labels.ts`.
+  - O uso do mês é um store do Zustand (`src/store/usageStore.ts`).
+  - A interface usa **shadcn/ui** (`components.json`: base Radix, preset `nova`, cor neutra, fonte Geist, ícones lucide):
+    - Para adicionar um componente, rode `bunx shadcn@latest add <nome>` em `app/`. Ele cai em `src/components/ui/`.
+    - Não edite à mão os arquivos de `src/components/ui/`. Ajuste a aparência por `className` em quem usa o componente.
+    - O `cn` vem do pacote `cn` (do próprio shadcn), reexportado em `src/lib/utils.ts`.
+    - As cores do tema ficam nas variáveis CSS de `src/css/index.css`.
+  - Os componentes próprios ficam em `src/components/search/` (formulário, chave do Google, andamento e histórico), `src/components/leads/` (filtros, tabela, painel de detalhes, badge do site e select de status) e `src/components/admin/` (usuários, empresas e entradas). `PageHeader`, `UsageMeter`, `RequireAuth` e `RequireAdmin` ficam na raiz de `src/components/`.
+  - Os avisos usam o `toast` do `sonner`; o `Toaster` e o `TooltipProvider` ficam em `src/pages/layout.tsx`.
+  - Formatação em pt-BR (data, número e nota) fica em `src/lib/format.ts`.
+- Os valores de enum ficam em inglês no código (`NO_WEBSITE`, `CONTACTED`) e são exibidos em português na interface.
+
+## Aplicação
+
+### Nenhum dado é descartado
+
+Tudo o que a API devolve é guardado. A filtragem (tem site, fechada, nota etc.) acontece **só na consulta**, pelos filtros da interface e da API. Nunca na gravação.
+
+- O corpo de cada resposta do Google fica em `ApiRequest.response`, sem alteração. Isso inclui as respostas de erro e os lugares que não viram lead, por exemplo um lugar sem `id`.
+- Esse corpo é gravado **antes** de processar os leads. Se a gravação dos leads falhar, a página paga continua no banco e pode ser reprocessada.
+- Todo lugar com `id` vira um `Lead`, qualquer que seja a situação do site ou o `businessStatus`.
+
+### Dados (`api/prisma/schema.prisma`)
+
+- **`ApiRequest`**: uma linha por chamada ao Google, com `period` (mês no fuso do Pacífico), página, status (`PENDING`/`SUCCESS`/`ERROR`), status HTTP, nº de resultados, erro, `response` (o corpo da resposta como veio), o usuário e `keyHash` (hash da chave usada).
+- **`Search`**: uma busca de um usuário. Guarda cidade, categoria, bairro, `textQuery`, páginas pedidas e buscadas, leads novos (novos **para esse usuário**) e `status` (`DONE`/`LIMIT_REACHED`/`FAILED`). `exhausted` indica que não havia mais páginas.
+- **`Lead`**: uma empresa do Google, **a mesma para todos os usuários**. `id` = `places.id`. Quando outro usuário acha a mesma empresa, ela não é duplicada: ele só passa a tê-la na lista dele (`UserLead`), e os dados do Google são atualizados.
+  - Dados do Google. Cada busca que reencontra a empresa sobrescreve esses dados, e o `siteStatus`, com os da resposta mais recente. Um campo que sumiu do Google fica vazio, e os valores antigos continuam nas respostas guardadas em `ApiRequest.response`. Esses dados ficam em:
+    - colunas próprias para o que a interface usa: nome, endereço, bairro, telefones, site, nota, avaliações, `types`, `pureServiceArea`, `openingHours`, `priceLevel` e os links de fotos e avaliações;
+    - `googleData`, um JSON com o objeto `Place` completo, com todos os campos do field mask. A listagem não devolve esse campo.
+  - `siteStatus`.
+  - `state`: sigla do estado, vinda de `addressComponents`.
+- **`UserLead`**: a empresa na lista de um usuário. Chave: usuário + `leadId`.
+  - Campos de acompanhamento: `status` e `notes`. Cada usuário tem os seus, e o de um não aparece para o outro.
+  - Busca de origem: `city`, `category`, `searchNeighborhood` e `firstSearchId`, da primeira busca **desse usuário** que trouxe a empresa. `firstSeenAt` é quando ela entrou na lista dele.
+  - Esses campos nunca são sobrescritos por uma busca.
+  - A API devolve o lead "achatado": os campos do `Lead` com os do `UserLead` por cima (`toUserLead` em `src/services/leads.js`).
+- **`SearchLead`**: quais empresas cada busca trouxe, com a página e a data.
+- **`User`**: quem pode entrar no app.
+  - E-mail (sempre em minúsculas) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
+  - `role`: `ADMIN` ou `USER`.
+  - `googleApiKey` (cifrada) e `googleApiKeyHash` (único).
+- **`UserAccess`**: as entradas de cada usuário no app (`startedAt` e `lastSeenAt`). Cada `GET /me`, que o front chama ao abrir o app, registra uma entrada; aberturas com menos de 30 minutos de intervalo estendem a mesma.
+
+### Classificação do `websiteUri` (`api/src/utils/_classifySite.js`)
+
+| `websiteUri` | Situação |
+|---|---|
+| vazio | **sem site** |
+| `instagram.com` | **só Instagram** |
+| `wa.me` / `whatsapp.com` / `wa.link` | **só WhatsApp** |
+| `facebook.com` / `fb.com` | **só Facebook** |
+| `linktr.ee` e outros agregadores de links | **agregador de links** |
+| qualquer outro | **tem site**: provavelmente não é lead, mas vale conferir |
+
+Os subdomínios contam como o domínio principal: `m.facebook.com` também é Facebook.
+
+### Autenticação
+
+- **Login por e-mail e senha.** `POST /auth/login` confere a senha e devolve `{ token, user }`. O token é um JWT com `{ id }`, válido por 7 dias.
+- **Não há cadastro pela API.** Usuários só são criados pelo terminal, em `api/`, com `bun run user:create [email] [--admin]`:
+  - o script mostra em qual banco vai gravar (só o host), pede a senha duas vezes sem mostrá-la e exige pelo menos 8 caracteres;
+  - sem `--admin`, um usuário novo é comum; com `--admin`, ele (ou o existente) vira administrador;
+  - se o e-mail já existe, ele troca a senha e mantém o papel, a menos que venha `--admin`;
+  - ele grava no banco da `DATABASE_URL` do `.env`. Para criar o usuário de produção, aponte para o Supabase.
+- **Rotas protegidas:** todas, menos `POST /auth/login` e `GET /`, passam pelo `verifyJWT` (`src/middlewares/auth.js`). Sem token, ou com token inválido ou expirado, a resposta é 401 `{ message }`.
+- **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
+- **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
+  - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
+- Na migration `users_own_leads`, os dados que já existiam foram para o primeiro usuário (o de menor id), que virou admin. No Supabase, o único usuário antes dela é `admin@gmail.com` (os anteriores foram apagados em 19/10/2026).
+- A senha é guardada com `scrypt` do Node (`src/utils/_password.js`), com salt aleatório e comparação em tempo constante.
+- **No app:**
+  - o token fica no `localStorage` (`search-company:auth`, em `src/store/authStore.ts`) e o interceptor do axios o envia como `Authorization: Bearer`;
+  - um 401 fora do login encerra a sessão;
+  - o `RequireAuth` manda quem não tem sessão para `/login?next=<página>`, e depois do login volta para ela (o `next` só aceita caminhos do próprio app);
+  - token vencido ou sem formato de JWT conta como sem sessão (`src/lib/token.ts` lê o `exp`). A assinatura só a API confere: um token falso com prazo abre a tela, mas a primeira chamada volta 401 e encerra a sessão;
+  - o botão "Sair" fica no cabeçalho;
+  - ao abrir o app, o `Layout` chama `GET /me`, que atualiza o papel e a chave no `authStore` e registra a entrada;
+  - o link "Admin" só aparece para o admin, e o `RequireAdmin` manda os outros de volta para a busca.
+
+### Endpoints do backend
+
+Todos, menos `POST /auth/login` e `GET /`, exigem o header `Authorization: Bearer <token>`.
+
+- `POST /auth/login` com `{ email, password }`: devolve `{ token, user }`, ou 401 com e-mail ou senha errados.
+- `GET /me`: o usuário logado, `{ id, email, role, hasGoogleApiKey, googleApiKeyEnd }`. Registra uma entrada no app.
+- `PUT /me/google-api-key` com `{ apiKey }`: salva a chave, cifrada. Responde 409 se ela já está em outra conta. `DELETE /me/google-api-key` remove.
+- `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`.
+- `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }`: roda **uma** combinação, com a chave salva do usuário.
+  - Sem chave salva, responde 400, antes de qualquer outra verificação.
+  - Respostas: 201 com `{ skipped, search, usage }`, 409 com outra busca do usuário em andamento e 429 com a cota dele esgotada.
+  - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
+- `GET /searches`: histórico do usuário, com as mais recentes primeiro.
+- `GET /leads`: listagem paginada dos leads do usuário.
+  - Filtros: `siteStatus`, `status` e `businessStatus` (aceitam vários valores separados por vírgula), `minRating`, `minReviews`, `city`, `category`, `neighborhood` e `q` (nome).
+  - Também aceita `page`, `pageSize` (até 100) e `orderBy` (`reviews`, `rating`, `name` ou `recent`).
+  - Todas as ordenações terminam no `leadId`, para a paginação não repetir nem pular empresas empatadas.
+- `GET /leads/filters`: cidades, categorias e bairros dos leads do usuário.
+- `PATCH /leads/:id`: altera só `status` e `notes` do lead **na lista do usuário**. 404 se a empresa não está na lista dele.
+- Só admin (403 para os outros):
+  - `GET /admin/users`: todos os usuários, com empresas, buscas, uso do mês, entradas, último acesso e se têm chave.
+  - `GET /admin/users/:id`: um usuário, com os mesmos números.
+  - `GET /admin/users/:id/leads`: os leads dele, com os mesmos filtros e a paginação de `GET /leads`.
+  - `GET /admin/users/:id/accesses`: as entradas dele no app, as mais recentes primeiro (até 200).
+
+### Frontend
+
+- **Busca (`/`):**
+  - Chave da API do Google da conta (`src/components/search/GoogleApiKeyField.tsx`): sem chave, um campo para salvar; com chave, "Salva, termina em XXXX" com "Trocar" e "Remover". Ela não fica no navegador, e o `main.jsx` apaga a cópia que versões antigas guardavam no `localStorage`.
+  - Campos de cidade, categorias e bairros (um por linha), páginas por busca e "pular buscas já feitas".
+  - Mostra a estimativa de custo (combinações × páginas) e pede confirmação num diálogo antes de rodar.
+  - Roda as combinações em sequência, mostrando o andamento, e permite parar depois da atual. Também mostra o histórico.
+- **Leads (`/leads`):**
+  - Filtros em chips (situação do site, status e funcionamento) e campos para nome, cidade, categoria, bairro, nota mínima, mínimo de avaliações e ordenação.
+  - Por padrão, "Tem site" vem desmarcado e os outros chips mostram tudo. Isso só esconde da tela: os dados continuam no banco.
+  - **O estado da tela fica na URL** (`/leads?q=…&siteStatus=…&page=3&pageSize=25`), por `src/lib/leadQuery.ts`:
+    - A URL só guarda o que difere do padrão. `siteStatus=` vazio significa "nenhuma situação marcada" (mostra todas), e a ausência do parâmetro significa o padrão.
+    - Recarregar, abrir em outra aba e usar voltar/avançar mantêm filtros e página.
+    - Mudar de página cria uma entrada no histórico. Mudar filtros só substitui a URL atual.
+    - Os campos digitados (nome e mínimo de avaliações) só vão para a URL e para a API depois de 300 ms sem digitar.
+    - Valores inválidos na URL voltam ao padrão, e uma página além da última vai para a última.
+    - O link "Leads" do menu volta aos últimos filtros usados (`src/store/leadsViewStore.ts`, só em memória).
+  - Paginação na API (`page`, `pageSize` até 100). A tela oferece 25, 50 ou 100 linhas por página e números de página com reticências; no celular mostra "2 de 6".
+  - Empresas que não estão funcionando aparecem com um aviso em vermelho embaixo do nome.
+  - Cada linha tem um ícone que copia o pedido de landing page (`src/lib/landingPrompt.ts`): `/landing-page create an landing page for this {instagram} handle and maps {google_fotos_link} ask me anything you are unsure`.
+    - `{instagram}` vira o perfil da empresa quando o site no Google é o Instagram ("Só Instagram"); `{google_fotos_link}` vira o link das fotos no Maps, ou o da página no Maps.
+    - O que faltar continua como marcador no texto, e um aviso pede para completar.
+  - Na tabela, o status pode ser trocado direto. O painel lateral de detalhes tem anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações.
+- **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
+  - lista dos usuários com empresas, buscas, requisições no mês, entradas, último acesso e se têm chave do Google;
+  - página de cada usuário (`/admin/users/:id`) com esses números, as empresas dele (só leitura, das mais recentes) e as entradas no app.
+- O cabeçalho mostra as requisições usadas no mês **pelo usuário** numa barra que muda de cor: verde, âmbar com menos de 100 restantes e vermelho quando a cota acaba.
+
+## Testes
+
+**Nunca teste contra o banco principal.** As linhas de `ApiRequest` de teste entram na contagem do mês real. Os testes usam:
+
+- um banco separado, criado com `docker exec search-company-db createdb -U search search_company_test` e preparado com `DATABASE_URL=... bunx prisma migrate deploy`;
+- um mock HTTP da Text Search, apontado por `PLACES_API_URL`;
+- chaves falsas salvas pela tela ou por `PUT /me/google-api-key`, um `ENCRYPTION_KEY` próprio do teste e `MONTHLY_REQUEST_LIMIT` baixo;
+- usuários de teste criados com `bun run user:create` apontando para o banco de teste. A migration `users_own_leads` recusa rodar num banco com dados e sem nenhum usuário.
+
+Ao terminar, apague o banco de teste com `dropdb`.
+
+## Abordagem comercial
+
+- Priorize empresas com nota boa e muitas avaliações: elas têm clientes e dinheiro girando. Por isso a ordenação padrão é "mais avaliações".
+- "Sem site no Maps" não garante que a empresa não tenha site. Confira antes de abordar.
+- Quem usa Instagram ou WhatsApp no lugar de site também é lead, e isso é um bom argumento de venda.
+- **Nada de disparo em massa** no WhatsApp: isso gera bloqueio e conta como spam. Mande mensagens individuais e personalizadas.
+- Uma tática forte é mandar o print de uma prévia do site, já com o nome e as fotos do negócio.
+
+## Status do Google Cloud
+
+Projeto `prospeccao-sites`, com faturamento vinculado.
+
+- [x] Chave de API criada (o usuário a informa na tela de busca)
+- [ ] Confirmar que a **Places API (New)** está ativada
+- [ ] Restringir a chave só à Places API (New)
+- [ ] Baixar a cota por minuto do Text Search (ex.: 10/min) e deixar `REQUESTS_PER_MINUTE` igual
+- [ ] Criar um alerta de orçamento de R$ 5 (ele só manda e-mail, não bloqueia)
+
+O Google **não bloqueia** sozinho quando a cota grátis acaba, então a proteção principal é a trava no backend. No cadastro do cartão, o Google faz uma pré-autorização de R$ 125, que não é cobrada e some em alguns dias.
+
+## Decisões em aberto
+
+- **Armazenamento dos dados dos leads.** Pelos termos, só o `place_id` pode ser guardado, e coordenadas só podem ficar até 30 dias. O app grava hoje o nome, o telefone, o site e a nota no banco. Também grava `location`, `viewport` e `plusCode` dentro de `googleData`. Há duas saídas:
+  - aceitar esse risco, já que o uso é pessoal;
+  - guardar só o `place_id`, a classificação e os dados próprios (status e anotações), e buscar o resto de novo quando precisar. Isso custa um Place Details Enterprise por empresa e pesa no limite de requisições.
