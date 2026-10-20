@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { ReactNode } from 'react'
 import { Search, X } from 'lucide-react'
 import { Button } from 'src/components/ui/button'
@@ -17,7 +18,6 @@ import {
 import { cn } from 'src/lib/utils'
 import type { BusinessStatus, LeadFilterOptions, LeadFilters as Filters, LeadOrder, LeadStatus, SiteStatus } from 'src/types'
 
-// O Select do Radix não aceita valor vazio; "all" representa "sem filtro".
 const ALL = 'all'
 
 const CHIP_CLASS =
@@ -71,7 +71,7 @@ function Dot({ className }: { className: string }) {
 	return <span className={cn('size-2 shrink-0 rounded-full', className)} />
 }
 
-export default function LeadFilters({ filters, options, onChange, onReset }: LeadFiltersProps) {
+function LeadFilters({ filters, options, onChange, onReset }: LeadFiltersProps) {
 	return (
 		<Card>
 			<CardHeader>
@@ -207,9 +207,10 @@ export default function LeadFilters({ filters, options, onChange, onReset }: Lea
 							))}
 						</ToggleGroup>
 					</ChipRow>
-					<p className='text-xs text-muted-foreground'>Num grupo sem nenhuma opção marcada, aparecem todas.</p>
 				</div>
 			</CardContent>
 		</Card>
 	)
 }
+
+export default memo(LeadFilters)

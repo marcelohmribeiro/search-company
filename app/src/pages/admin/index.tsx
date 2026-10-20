@@ -1,29 +1,18 @@
-import { useEffect, useState } from 'react'
 import { CircleAlert } from 'lucide-react'
 import UsersTable from 'src/components/admin/UsersTable'
 import PageHeader from 'src/components/PageHeader'
 import { Alert, AlertDescription, AlertTitle } from 'src/components/ui/alert'
 import { Card } from 'src/components/ui/card'
 import { Skeleton } from 'src/components/ui/skeleton'
-import { fetchAdminUsers, getErrorMessage } from 'src/services'
-import type { AdminUser } from 'src/types'
+import { useApi } from 'src/hooks'
+import { fetchAdminUsers } from 'src/services'
 
 export default function AdminUsers() {
-	const [users, setUsers] = useState<AdminUser[] | null>(null)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		fetchAdminUsers()
-			.then(setUsers)
-			.catch((loadError) => setError(getErrorMessage(loadError)))
-	}, [])
+	const { data: users, error } = useApi(fetchAdminUsers)
 
 	return (
 		<div className='space-y-6'>
-			<PageHeader
-				title='Usuários'
-				description='Quem usa o app, as empresas de cada um e quando entrou.'
-			/>
+			<PageHeader title='Usuários' />
 
 			{error ? (
 				<Alert variant='destructive'>

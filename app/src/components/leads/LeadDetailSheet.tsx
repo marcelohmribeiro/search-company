@@ -76,7 +76,7 @@ function LeadDetail({ lead, onSaved, onClose }: { lead: Lead; onSaved: (lead: Le
 				<div className='flex flex-wrap gap-1.5 pt-2'>
 					<SiteStatusBadge status={lead.siteStatus} />
 					{closed && (
-						<Badge variant='outline' className='border-red-200 bg-red-50 text-red-700'>
+						<Badge variant='outline' className='border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300'>
 							{businessStatusLabel(lead.businessStatus)}
 						</Badge>
 					)}

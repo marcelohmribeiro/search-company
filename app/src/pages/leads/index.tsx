@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigationType, useSearchParams } from 'react-router'
+import { useCallback, useEffect, useState } from 'react'
 import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
@@ -7,152 +6,74 @@ import LeadDetailSheet from 'src/components/leads/LeadDetailSheet'
 import LeadFilters from 'src/components/leads/LeadFilters'
 import LeadsTable from 'src/components/leads/LeadsTable'
 import { Alert, AlertDescription, AlertTitle } from 'src/components/ui/alert'
+import { useApi, useLeadQuery } from 'src/hooks'
 import { plural } from 'src/lib/format'
-import { buildLeadSearchParams, parseLeadQuery } from 'src/lib/leadQuery'
-import type { LeadQuery } from 'src/lib/leadQuery'
 import { fetchLeadFilterOptions, fetchLeads, getErrorMessage, updateLead } from 'src/services'
-import { useLeadsViewStore } from 'src/store/leadsViewStore'
-import type { Lead, LeadFilterOptions, LeadFilters as Filters, LeadPage, LeadStatus } from 'src/types'
+import type { Lead, LeadFilterOptions, LeadStatus } from 'src/types'
 
-// Campos digitados: a URL (e a busca na API) só muda depois de uma pausa na digitação.
-type TextFilters = Pick<Filters, 'q' | 'minReviews'>
-const TEXT_DEBOUNCE_MS = 300
+const EMPTY_OPTIONS: LeadFilterOptions = { cities: [], categories: [], neighborhoods: [] }
 
 export default function Leads() {
-	const [searchParams, setSearchParams] = useSearchParams()
-	const location = useLocation()
-	const navigationType = useNavigationType()
-	const setLastSearch = useLeadsViewStore((state) => state.setSearch)
+	const { query, filters, setFilters, resetFilters, setPage, setPageSize } = useLeadQuery()
+	const { page, pageSize } = query
 
-	const search = searchParams.toString()
-	const query = useMemo(() => parseLeadQuery(new URLSearchParams(search)), [search])
-	const { filters, page, pageSize } = query
+	const loadLeads = useCallback(() => fetchLeads(query.filters, query.page, query.pageSize), [query])
+	const leads = useApi(loadLeads)
+	const options = useApi(fetchLeadFilterOptions)
+	const { data, setData } = leads
+	const error = leads.error ?? options.error
 
-	const [text, setText] = useState<TextFilters>({ q: filters.q, minReviews: filters.minReviews })
-	const pendingText = useRef<Partial<TextFilters>>({})
-	const textTimer = useRef<number | undefined>(undefined)
-
-	const [data, setData] = useState<LeadPage | null>(null)
-	const [options, setOptions] = useState<LeadFilterOptions>({ cities: [], categories: [], neighborhoods: [] })
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
 	const [selected, setSelected] = useState<Lead | null>(null)
-	const [sheetOpen, setSheetOpen] = useState(false)
+	const [detailOpen, setDetailOpen] = useState(false)
 
-	/** Aplica uma mudança sobre a query atual da URL. `push` cria uma entrada no histórico do navegador. */
-	const updateQuery = useCallback(
-		(change: (current: LeadQuery) => LeadQuery, { push = false } = {}) =>
-			setSearchParams((current) => buildLeadSearchParams(change(parseLeadQuery(current))), { replace: !push }),
-		[setSearchParams],
-	)
-
-	useEffect(() => {
-		setLastSearch(location.search)
-	}, [location.search, setLastSearch])
-
-	// Voltar e avançar no navegador trocam a URL sem passar pelos campos digitados.
-	useEffect(() => {
-		if (navigationType === 'POP') setText({ q: filters.q, minReviews: filters.minReviews })
-	}, [location.key, navigationType, filters.q, filters.minReviews])
-
-	useEffect(() => () => window.clearTimeout(textTimer.current), [])
-
-	useEffect(() => {
-		fetchLeadFilterOptions()
-			.then(setOptions)
-			.catch((optionsError) => setError(getErrorMessage(optionsError)))
-	}, [])
-
-	useEffect(() => {
-		let ignore = false
-		setLoading(true)
-		fetchLeads(query.filters, query.page, query.pageSize)
-			.then((result) => {
-				if (ignore) return
-				setData(result)
-				setError(null)
-			})
-			.catch((leadsError) => !ignore && setError(getErrorMessage(leadsError)))
-			.finally(() => !ignore && setLoading(false))
-		return () => {
-			ignore = true
-		}
-	}, [query])
-
-	// Uma URL antiga pode apontar para uma página que não existe mais com os filtros atuais.
 	useEffect(() => {
 		if (!data) return
 		const lastPage = Math.max(1, Math.ceil(data.total / data.pageSize))
-		if (page > lastPage) updateQuery((current) => ({ ...current, page: lastPage }))
-	}, [data, page, updateQuery])
+		if (page > lastPage) setPage(lastPage, false)
+	}, [data, page, setPage])
 
-	const changeFilters = (changes: Partial<Filters>) =>
-		updateQuery((current) => ({ ...current, filters: { ...current.filters, ...changes }, page: 1 }))
+	const changePage = useCallback(
+		(next: number) => {
+			setPage(next)
+			document.getElementById('leads-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+		},
+		[setPage],
+	)
 
-	function changeText(changes: Partial<TextFilters>) {
-		setText((current) => ({ ...current, ...changes }))
-		pendingText.current = { ...pendingText.current, ...changes }
-		window.clearTimeout(textTimer.current)
-		textTimer.current = window.setTimeout(() => {
-			const pending = pendingText.current
-			pendingText.current = {}
-			changeFilters(pending)
-		}, TEXT_DEBOUNCE_MS)
-	}
+	const replaceLead = useCallback(
+		(lead: Lead) =>
+			setData((current) => current && { ...current, items: current.items.map((item) => (item.id === lead.id ? lead : item)) }),
+		[setData],
+	)
 
-	function handleFiltersChange({ q, minReviews, ...rest }: Partial<Filters>) {
-		if (q !== undefined) changeText({ q })
-		if (minReviews !== undefined) changeText({ minReviews })
-		if (Object.keys(rest).length) changeFilters(rest)
-	}
+	const changeStatus = useCallback(
+		async (lead: Lead, status: LeadStatus) => {
+			replaceLead({ ...lead, status })
+			try {
+				replaceLead(await updateLead(lead.id, { status }))
+			} catch (statusError) {
+				replaceLead(lead)
+				toast.error('Não foi possível mudar o status', { description: getErrorMessage(statusError) })
+			}
+		},
+		[replaceLead],
+	)
 
-	function resetFilters() {
-		window.clearTimeout(textTimer.current)
-		pendingText.current = {}
-		setText({ q: '', minReviews: '' })
-		setSearchParams(new URLSearchParams(), { replace: true })
-	}
-
-	function changePage(next: number) {
-		updateQuery((current) => ({ ...current, page: next }), { push: true })
-		document.getElementById('leads-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-	}
-
-	const changePageSize = (next: number) => updateQuery((current) => ({ ...current, pageSize: next, page: 1 }))
-
-	const replaceLead = (lead: Lead) =>
-		setData((current) => current && { ...current, items: current.items.map((item) => (item.id === lead.id ? lead : item)) })
-
-	async function changeStatus(lead: Lead, status: LeadStatus) {
-		replaceLead({ ...lead, status })
-		try {
-			replaceLead(await updateLead(lead.id, { status }))
-		} catch (statusError) {
-			replaceLead(lead)
-			toast.error('Não foi possível mudar o status', { description: getErrorMessage(statusError) })
-		}
-	}
-
-	function openLead(lead: Lead) {
+	const openLead = useCallback((lead: Lead) => {
 		setSelected(lead)
-		setSheetOpen(true)
-	}
-
-	const total = data?.total ?? 0
+		setDetailOpen(true)
+	}, [])
 
 	return (
 		<div className='space-y-6'>
 			<PageHeader
 				title='Leads'
-				description={data ? `${plural(total, 'empresa encontrada', 'empresas encontradas')} com esses filtros.` : 'Carregando…'}
+				description={
+					data ? `${plural(data.total, 'empresa encontrada', 'empresas encontradas')} com esses filtros.` : 'Carregando…'
+				}
 			/>
 
-			<LeadFilters
-				filters={{ ...filters, ...text }}
-				options={options}
-				onChange={handleFiltersChange}
-				onReset={resetFilters}
-			/>
+			<LeadFilters filters={filters} options={options.data ?? EMPTY_OPTIONS} onChange={setFilters} onReset={resetFilters} />
 
 			{error && (
 				<Alert variant='destructive'>
@@ -165,20 +86,20 @@ export default function Leads() {
 			{!(error && !data) && (
 				<LeadsTable
 					leads={data?.items ?? []}
-					total={total}
+					total={data?.total ?? 0}
 					page={page}
 					pageSize={pageSize}
-					loading={loading && !data}
-					refreshing={loading && !!data}
+					loading={leads.loading && !data}
+					refreshing={leads.loading && !!data}
 					onPageChange={changePage}
-					onPageSizeChange={changePageSize}
+					onPageSizeChange={setPageSize}
 					onOpen={openLead}
 					onStatusChange={changeStatus}
 					onResetFilters={resetFilters}
 				/>
 			)}
 
-			<LeadDetailSheet lead={selected} open={sheetOpen} onOpenChange={setSheetOpen} onSaved={replaceLead} />
+			<LeadDetailSheet lead={selected} open={detailOpen} onOpenChange={setDetailOpen} onSaved={replaceLead} />
 		</div>
 	)
 }

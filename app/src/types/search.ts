@@ -1,3 +1,5 @@
+import type { Lead } from './lead'
+
 export type SearchStatus = 'RUNNING' | 'DONE' | 'LIMIT_REACHED' | 'FAILED'
 
 export interface Usage {
@@ -38,7 +40,6 @@ export interface SearchResult {
 	usage: Usage
 }
 
-/** Uma combinação de categoria e bairro, que vira uma chamada a `POST /searches`. */
 export interface SearchCombo {
 	category: string
 	neighborhood?: string
@@ -46,18 +47,27 @@ export interface SearchCombo {
 
 export type SearchComboStatus = 'pending' | 'running' | 'done' | 'skipped' | 'limit' | 'error' | 'stopped'
 
-/** Andamento de uma combinação durante a execução de uma busca na tela. */
 export interface SearchComboProgress extends SearchCombo {
 	status: SearchComboStatus
 	search?: Search
 	message?: string
 }
 
-/** O que o formulário de busca envia para execução. */
 export interface SearchRequest {
 	apiKey: string
 	city: string
 	combos: SearchCombo[]
 	maxPages: number
 	skipIfDone: boolean
+}
+
+export interface SearchLead extends Lead {
+	page: number
+	/** `true` se essa busca colocou a empresa na lista do usuário. */
+	isNew: boolean
+}
+
+export interface SearchLeads {
+	search: Search
+	items: SearchLead[]
 }

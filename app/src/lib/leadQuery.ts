@@ -4,7 +4,7 @@ import type { LeadFilters } from 'src/types'
 export const PAGE_SIZE_OPTIONS = [25, 50, 100]
 export const DEFAULT_PAGE_SIZE = 50
 
-/** "Tem site" fica de fora por padrão: o foco são empresas sem site próprio. */
+/** Por padrão, "Tem site" fica de fora. */
 export const DEFAULT_FILTERS: LeadFilters = {
 	siteStatus: SITE_STATUS_OPTIONS.map((option) => option.value).filter((value) => value !== 'HAS_WEBSITE'),
 	status: [],
@@ -18,7 +18,6 @@ export const DEFAULT_FILTERS: LeadFilters = {
 	orderBy: 'reviews',
 }
 
-/** Estado da tela de Leads guardado na URL. */
 export interface LeadQuery {
 	filters: LeadFilters
 	page: number
@@ -29,7 +28,6 @@ const TEXT_KEYS = ['q', 'city', 'category', 'neighborhood'] as const
 
 const sameItems = (a: string[], b: string[]) => a.length === b.length && a.every((item) => b.includes(item))
 
-// Ausente usa o padrão; presente e vazio ("siteStatus=") quer dizer nenhuma opção marcada.
 function readList<T extends string>(params: URLSearchParams, key: string, allowed: { value: T }[], fallback: T[]) {
 	const raw = params.get(key)
 	if (raw === null) return fallback
@@ -42,10 +40,7 @@ function readPositiveInt(raw: string | null, fallback: number) {
 	return Number.isInteger(value) && value >= 1 ? value : fallback
 }
 
-/**
- * Lê filtros, página e tamanho de página da query string. Valores inválidos voltam ao padrão,
- * para uma URL editada à mão não gerar erro na API.
- */
+/** Lê a query string da tela de leads; valores inválidos voltam ao padrão. */
 export function parseLeadQuery(params: URLSearchParams): LeadQuery {
 	const minRating = params.get('minRating') ?? ''
 	const minReviews = params.get('minReviews') ?? ''
@@ -68,7 +63,7 @@ export function parseLeadQuery(params: URLSearchParams): LeadQuery {
 	}
 }
 
-/** Query string com só o que difere do padrão, para a URL ficar curta. Inverso de `parseLeadQuery`. */
+/** Monta a query string só com o que difere do padrão. */
 export function buildLeadSearchParams({ filters, page, pageSize }: LeadQuery) {
 	const params = new URLSearchParams()
 	for (const key of TEXT_KEYS) {
@@ -86,10 +81,7 @@ export function buildLeadSearchParams({ filters, page, pageSize }: LeadQuery) {
 	return params
 }
 
-/**
- * Páginas a mostrar na paginação, sempre 7 posições quando há mais de 7 páginas.
- * `null` é uma reticência. Ex.: página 6 de 20 vira [1, null, 5, 6, 7, null, 20].
- */
+/** Páginas da paginação; `null` é uma reticência. */
 export function pageItems(current: number, total: number): (number | null)[] {
 	if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
 	if (current <= 4) return [1, 2, 3, 4, 5, null, total]

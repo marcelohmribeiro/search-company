@@ -1,4 +1,4 @@
-/** Prazo do JWT (`exp` do payload) em milissegundos, ou `null` se o token não tiver esse formato. */
+/** Validade do JWT em milissegundos, ou `null` se o token não for um JWT. */
 function tokenExpiry(token: string) {
 	try {
 		const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
@@ -9,10 +9,7 @@ function tokenExpiry(token: string) {
 	}
 }
 
-/**
- * Indica um token com formato de JWT e ainda no prazo.
- * A assinatura não é conferida aqui: quem confere é a API, que responde 401 a um token falso.
- */
+/** Indica token com formato de JWT e no prazo. A assinatura só a API confere. */
 export function isTokenActive(token: string | null): token is string {
 	const expiry = token ? tokenExpiry(token) : null
 	return expiry !== null && expiry > Date.now()

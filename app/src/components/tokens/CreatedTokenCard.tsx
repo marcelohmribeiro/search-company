@@ -6,11 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/c
 import { settings } from 'src/config'
 import type { CreatedApiToken } from 'src/types'
 
-/** Bloco `env` do `~/.claude/settings.json`: a skill `proposta-site` lê a API e o token dessas variáveis. */
+/** Bloco `env` do `~/.claude/settings.json` com a URL da API e o token. */
 const envSnippet = (token: string) =>
 	JSON.stringify({ env: { SEARCH_COMPANY_API_URL: settings.API_URL, SEARCH_COMPANY_TOKEN: token } }, null, 2)
 
-/** Mostra o token recém-criado uma única vez, já no formato do `settings.json` do Claude Code. */
 export default function CreatedTokenCard({ created, onDone }: { created: CreatedApiToken; onDone: () => void }) {
 	const [copied, setCopied] = useState(false)
 	const snippet = envSnippet(created.token)
@@ -26,10 +25,10 @@ export default function CreatedTokenCard({ created, onDone }: { created: Created
 	}
 
 	return (
-		<Card className='border-emerald-200 bg-emerald-50/40'>
+		<Card className='border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/40'>
 			<CardHeader>
 				<CardTitle>Token "{created.name}" criado</CardTitle>
-				<CardDescription className='flex items-start gap-1.5 text-amber-700'>
+				<CardDescription className='flex items-start gap-1.5 text-amber-700 dark:text-amber-300'>
 					<TriangleAlert className='mt-0.5 size-4 shrink-0' />
 					Copie agora: este valor não aparece de novo.
 				</CardDescription>

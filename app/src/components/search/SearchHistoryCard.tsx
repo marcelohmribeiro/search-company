@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { CircleAlert, History } from 'lucide-react'
+import SearchLeadsDialog from 'src/components/search/SearchLeadsDialog'
 import { Alert, AlertDescription, AlertTitle } from 'src/components/ui/alert'
 import { Badge } from 'src/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/components/ui/card'
@@ -35,11 +37,13 @@ function StatusBadge({ search }: { search: Search }) {
 }
 
 export default function SearchHistoryCard({ searches, loading, error }: SearchHistoryCardProps) {
+	const [opened, setOpened] = useState<Search | null>(null)
+
 	return (
 		<Card>
 			<CardHeader>
 				<CardTitle>Histórico</CardTitle>
-				<CardDescription>Buscas mais recentes primeiro.</CardDescription>
+				<CardDescription>Buscas mais recentes primeiro. Clique numa busca para ver as empresas que ela trouxe.</CardDescription>
 			</CardHeader>
 
 			<CardContent>
@@ -79,7 +83,7 @@ export default function SearchHistoryCard({ searches, loading, error }: SearchHi
 							</TableHeader>
 							<TableBody>
 								{searches.map((search) => (
-									<TableRow key={search.id}>
+									<TableRow key={search.id} onClick={() => setOpened(search)}>
 										<TableCell className='text-muted-foreground tabular-nums'>{formatDateTime(search.createdAt)}</TableCell>
 										<TableCell className='max-w-80 truncate font-medium'>{search.textQuery}</TableCell>
 										<TableCell>
@@ -94,6 +98,8 @@ export default function SearchHistoryCard({ searches, loading, error }: SearchHi
 					</div>
 				)}
 			</CardContent>
+
+			<SearchLeadsDialog search={opened} onClose={() => setOpened(null)} />
 		</Card>
 	)
 }

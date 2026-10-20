@@ -13,7 +13,7 @@ import {
 import { Badge } from 'src/components/ui/badge'
 import { Button } from 'src/components/ui/button'
 import GoogleApiKeyField from 'src/components/search/GoogleApiKeyField'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from 'src/components/ui/card'
+import { Card, CardContent, CardFooter } from 'src/components/ui/card'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from 'src/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from 'src/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
@@ -87,11 +87,6 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>Nova busca</CardTitle>
-				<CardDescription>Cada combinação de categoria e bairro vira uma busca no Google Maps.</CardDescription>
-			</CardHeader>
-
 			<CardContent>
 				<FieldGroup>
 					<GoogleApiKeyField disabled={running} />
@@ -182,7 +177,7 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 						{formatNumber(remaining)} no mês
 					</p>
 					{!hasApiKey && (
-						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700'>
+						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700 dark:text-amber-300'>
 							<KeyRound className='size-3.5' />
 							Informe a chave da API do Google para buscar.
 						</p>
@@ -193,7 +188,7 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 						</p>
 					)}
 					{remaining > 0 && estimate > remaining && (
-						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700'>
+						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700 dark:text-amber-300'>
 							<TriangleAlert className='size-3.5' />
 							Passa do que resta: as buscas param ao chegar no limite.
 						</p>

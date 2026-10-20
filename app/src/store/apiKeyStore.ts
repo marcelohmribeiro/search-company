@@ -2,9 +2,8 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 interface ApiKeyState {
-	/** Chave da API do Google enviada em cada busca. O backend não a guarda: só a repassa ao Google. */
 	apiKey: string
-	/** Com `true`, a chave fica no localStorage deste navegador; senão, só na memória até recarregar. */
+	/** Com `true`, a chave fica no localStorage; senão, só na memória. */
 	remember: boolean
 	setApiKey: (apiKey: string) => void
 	setRemember: (remember: boolean) => void

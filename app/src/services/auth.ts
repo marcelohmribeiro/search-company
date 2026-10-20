@@ -6,7 +6,6 @@ export async function login(username: string, password: string) {
 	return data
 }
 
-/** Cria a conta e já devolve a sessão, como o login. */
 export async function register(username: string, password: string) {
 	const { data } = await api.post<LoginResult>('/auth/register', { username, password })
 	return data

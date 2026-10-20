@@ -11,8 +11,6 @@ api.interceptors.request.use((config) => {
 	return config
 })
 
-// Token ausente, expirado ou inválido: encerra a sessão, e as rotas protegidas mandam para o login.
-// No próprio login, o 401 é senha errada e só vira mensagem na tela.
 api.interceptors.response.use(undefined, (error) => {
 	if (isAxiosError(error) && error.response?.status === 401 && !error.config?.url?.startsWith('/auth/')) {
 		useAuthStore.getState().signOut()
@@ -20,9 +18,7 @@ api.interceptors.response.use(undefined, (error) => {
 	return Promise.reject(error)
 })
 
-/**
- * Mensagem de erro para exibir ao usuário: a do backend (`{ error }`) quando existir.
- */
+/** Mensagem de erro da API (`{ error }`), ou uma genérica. */
 function getErrorMessage(error: unknown): string {
 	if (isAxiosError(error)) {
 		if (error.response?.data?.error) return error.response.data.error

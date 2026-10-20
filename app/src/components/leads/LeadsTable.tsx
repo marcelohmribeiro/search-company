@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Copy, Ellipsis, MapPin, MessageCircle, PanelRightOpen, SearchX, Star, StickyNote } from 'lucide-react'
-import { toast } from 'sonner'
+import { memo } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, Ellipsis, MapPin, MessageCircle, Maximize2, SearchX, StickyNote } from 'lucide-react'
+import LeadRating from 'src/components/leads/LeadRating'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
 import SiteStatusBadge from 'src/components/leads/SiteStatusBadge'
 import { Badge } from 'src/components/ui/badge'
@@ -13,22 +14,23 @@ import { Spinner } from 'src/components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 'src/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from 'src/components/ui/tooltip'
 import { businessStatusLabel } from 'src/constants/labels'
-import { formatNumber, formatRating } from 'src/lib/format'
-import { landingPagePrompt } from 'src/lib/landingPrompt'
+import { formatNumber } from 'src/lib/format'
 import { PAGE_SIZE_OPTIONS, pageItems } from 'src/lib/leadQuery'
 import { whatsappUrl } from 'src/lib/phone'
 import type { Lead, LeadStatus } from 'src/types'
 
 const SKELETON_ROWS = 8
 
+const stopRowClick = (event: MouseEvent) => event.stopPropagation()
+
 interface LeadsTableProps {
 	leads: Lead[]
 	total: number
 	page: number
 	pageSize: number
-	/** Primeira carga, sem dados para mostrar. */
+	/** Primeira carga, sem dados. */
 	loading: boolean
-	/** Recarga com dados antigos ainda na tela. */
+	/** Recarga com os dados anteriores na tela. */
 	refreshing: boolean
 	onPageChange: (page: number) => void
 	onPageSizeChange: (pageSize: number) => void
@@ -52,41 +54,7 @@ function IconLink({ href, label, children }: { href: string; label: string; chil
 	)
 }
 
-const MISSING_LABELS: Record<string, string> = {
-	'{instagram}': 'o Instagram',
-	'{google_fotos_link}': 'as fotos no Maps',
-}
-
-async function copyLandingPrompt(lead: Lead) {
-	const { text, missing } = landingPagePrompt(lead)
-	try {
-		await navigator.clipboard.writeText(text)
-	} catch {
-		toast.error('Não foi possível copiar', { description: 'O navegador bloqueou o acesso à área de transferência.' })
-		return
-	}
-	if (missing.length) {
-		const absent = missing.map((marker) => MISSING_LABELS[marker]).join(' nem ')
-		toast.warning('Prompt copiado, mas incompleto', {
-			description: `O Google não tem ${absent} dessa empresa. Preencha ${missing.join(' e ')} antes de usar.`,
-		})
-	} else {
-		toast.success('Prompt da landing page copiado')
-	}
-}
-
-function Rating({ lead }: { lead: Lead }) {
-	if (lead.rating == null) return <span className='text-muted-foreground'>—</span>
-	return (
-		<span className='inline-flex items-center gap-1 whitespace-nowrap tabular-nums'>
-			<Star className='size-3.5 fill-amber-400 text-amber-400' />
-			<span className='font-medium'>{formatRating(lead.rating)}</span>
-			<span className='text-muted-foreground'>({formatNumber(lead.userRatingCount ?? 0)})</span>
-		</span>
-	)
-}
-
-export default function LeadsTable({
+function LeadsTable({
 	leads,
 	total,
 	page,
@@ -160,10 +128,13 @@ export default function LeadsTable({
 								const whatsapp = whatsappUrl(lead.internationalPhone)
 								const closed = lead.businessStatus && lead.businessStatus !== 'OPERATIONAL'
 								return (
-									<TableRow key={lead.id}>
+									<TableRow key={lead.id} onClick={() => onOpen(lead)}>
 										<TableCell className='max-w-72 pl-4'>
 											<button
-												onClick={() => onOpen(lead)}
+												onClick={(event) => {
+													event.stopPropagation()
+													onOpen(lead)
+												}}
 												className='block max-w-full truncate text-left font-medium hover:underline'
 											>
 												{lead.name}
@@ -171,7 +142,7 @@ export default function LeadsTable({
 											<div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
 												<span className='truncate'>{lead.primaryTypeName ?? lead.category}</span>
 												{closed && (
-													<Badge variant='outline' className='h-4 border-red-200 bg-red-50 px-1.5 text-[0.65rem] text-red-700'>
+													<Badge variant='outline' className='h-4 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 px-1.5 text-[0.65rem] text-red-700 dark:text-red-300'>
 														{businessStatusLabel(lead.businessStatus)}
 													</Badge>
 												)}
@@ -187,7 +158,7 @@ export default function LeadsTable({
 											{lead.neighborhood ?? lead.searchNeighborhood ?? '—'}
 										</TableCell>
 										<TableCell>
-											<Rating lead={lead} />
+											<LeadRating lead={lead} />
 										</TableCell>
 										<TableCell>
 											<SiteStatusBadge status={lead.siteStatus} />
@@ -195,7 +166,7 @@ export default function LeadsTable({
 										<TableCell className='tabular-nums'>
 											{lead.nationalPhone ?? <span className='text-muted-foreground'>—</span>}
 										</TableCell>
-										<TableCell>
+										<TableCell onClick={stopRowClick}>
 											<LeadStatusSelect
 												value={lead.status}
 												onChange={(status) => onStatusChange(lead, status)}
@@ -203,7 +174,7 @@ export default function LeadsTable({
 												className='w-36'
 											/>
 										</TableCell>
-										<TableCell className='pr-4'>
+										<TableCell className='pr-4' onClick={stopRowClick}>
 											<div className='flex justify-end gap-0.5'>
 												{lead.googleMapsUri && (
 													<IconLink href={lead.googleMapsUri} label='Abrir no Google Maps'>
@@ -212,26 +183,13 @@ export default function LeadsTable({
 												)}
 												{whatsapp && (
 													<IconLink href={whatsapp} label='Conversar no WhatsApp'>
-														<MessageCircle className='text-green-600' />
+														<MessageCircle className='text-green-600 dark:text-green-400' />
 													</IconLink>
 												)}
 												<Tooltip>
 													<TooltipTrigger asChild>
-														<Button
-															variant='ghost'
-															size='icon-sm'
-															onClick={() => copyLandingPrompt(lead)}
-															aria-label='Copiar prompt da landing page'
-														>
-															<Copy />
-														</Button>
-													</TooltipTrigger>
-													<TooltipContent>Copiar prompt da landing page</TooltipContent>
-												</Tooltip>
-												<Tooltip>
-													<TooltipTrigger asChild>
 														<Button variant='ghost' size='icon-sm' onClick={() => onOpen(lead)} aria-label='Ver detalhes'>
-															<PanelRightOpen />
+															<Maximize2 />
 														</Button>
 													</TooltipTrigger>
 													<TooltipContent>Ver detalhes</TooltipContent>
@@ -317,3 +275,5 @@ export default function LeadsTable({
 		</Card>
 	)
 }
+
+export default memo(LeadsTable)

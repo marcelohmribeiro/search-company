@@ -3,13 +3,11 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { AuthUser } from 'src/types'
 
 interface AuthState {
-	/** JWT do login, enviado em todas as chamadas à API. Expira em 7 dias. */
+	/** JWT do login, válido por 7 dias. */
 	token: string | null
 	user: AuthUser | null
 	signIn: (token: string, user: AuthUser) => void
-	/** Troca os dados do usuário (usuário, papel) pelos mais recentes da API. */
 	setUser: (user: AuthUser) => void
-	/** Apaga a sessão; as rotas protegidas voltam para o login. */
 	signOut: () => void
 }
 

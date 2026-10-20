@@ -15,10 +15,10 @@ import type { SearchComboProgress, SearchComboStatus } from 'src/types'
 
 const STATUS: Record<SearchComboStatus, { label: string; icon: LucideIcon | null; className: string }> = {
 	pending: { label: 'Aguardando', icon: CircleDashed, className: 'text-muted-foreground' },
-	running: { label: 'Buscando', icon: null, className: 'text-sky-600' },
-	done: { label: 'Concluída', icon: CircleCheck, className: 'text-emerald-600' },
+	running: { label: 'Buscando', icon: null, className: 'text-sky-600 dark:text-sky-400' },
+	done: { label: 'Concluída', icon: CircleCheck, className: 'text-emerald-600 dark:text-emerald-400' },
 	skipped: { label: 'Pulada', icon: SkipForward, className: 'text-muted-foreground' },
-	limit: { label: 'Parou no limite', icon: TriangleAlert, className: 'text-amber-600' },
+	limit: { label: 'Parou no limite', icon: TriangleAlert, className: 'text-amber-600 dark:text-amber-400' },
 	error: { label: 'Erro', icon: CircleX, className: 'text-destructive' },
 	stopped: { label: 'Não executada', icon: Ban, className: 'text-muted-foreground' },
 }

@@ -1,9 +1,6 @@
 import { api } from './_api'
 import type { Lead, LeadFilterOptions, LeadFilters, LeadPage, LeadStatus } from 'src/types'
 
-/**
- * Query string dos filtros, sem os campos vazios.
- */
 function leadFiltersToParams(filters: LeadFilters) {
 	const params = new URLSearchParams()
 	if (filters.siteStatus.length) params.set('siteStatus', filters.siteStatus.join(','))

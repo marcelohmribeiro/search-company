@@ -1,23 +1,21 @@
-import { ChevronLeft, ChevronRight, Building2, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Building2 } from 'lucide-react'
+import LeadRating from 'src/components/leads/LeadRating'
+import LeadStatusLabel from 'src/components/leads/LeadStatusLabel'
 import SiteStatusBadge from 'src/components/leads/SiteStatusBadge'
 import { Button } from 'src/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from 'src/components/ui/empty'
 import { Skeleton } from 'src/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from 'src/components/ui/table'
-import { leadStatusOption } from 'src/constants/labels'
-import { formatDate, formatNumber, formatRating } from 'src/lib/format'
+import { formatDate, formatNumber } from 'src/lib/format'
 import { cn } from 'src/lib/utils'
 import type { LeadPage } from 'src/types'
 
 interface UserLeadsTableProps {
-	/** `null` na primeira carga. */
 	data: LeadPage | null
-	/** Outra página carregando, com a anterior ainda na tela. */
 	refreshing: boolean
 	onPageChange: (page: number) => void
 }
 
-/** Empresas de um usuário, só para leitura: o admin vê o status e as anotações, mas não altera. */
 export default function UserLeadsTable({ data, refreshing, onPageChange }: UserLeadsTableProps) {
 	if (!data) {
 		return (
@@ -61,9 +59,7 @@ export default function UserLeadsTable({ data, refreshing, onPageChange }: UserL
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{data.items.map((lead) => {
-						const status = leadStatusOption(lead.status)
-						return (
+					{data.items.map((lead) => (
 							<TableRow key={lead.id}>
 								<TableCell className='max-w-64 pl-4'>
 									<p className='truncate font-medium'>{lead.name}</p>
@@ -72,29 +68,17 @@ export default function UserLeadsTable({ data, refreshing, onPageChange }: UserL
 								</TableCell>
 								<TableCell className='text-muted-foreground'>{lead.neighborhood ?? lead.searchNeighborhood ?? '—'}</TableCell>
 								<TableCell>
-									{lead.rating == null ? (
-										<span className='text-muted-foreground'>—</span>
-									) : (
-										<span className='inline-flex items-center gap-1 whitespace-nowrap tabular-nums'>
-											<Star className='size-3.5 fill-amber-400 text-amber-400' />
-											<span className='font-medium'>{formatRating(lead.rating)}</span>
-											<span className='text-muted-foreground'>({formatNumber(lead.userRatingCount ?? 0)})</span>
-										</span>
-									)}
+									<LeadRating lead={lead} />
 								</TableCell>
 								<TableCell>
 									<SiteStatusBadge status={lead.siteStatus} />
 								</TableCell>
 								<TableCell>
-									<span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
-										<span className={cn('size-2 shrink-0 rounded-full', status.dotClassName)} />
-										{status.label}
-									</span>
+									<LeadStatusLabel status={lead.status} />
 								</TableCell>
 								<TableCell className='pr-4 text-muted-foreground tabular-nums'>{formatDate(lead.firstSeenAt)}</TableCell>
 							</TableRow>
-						)
-					})}
+					))}
 				</TableBody>
 			</Table>
 

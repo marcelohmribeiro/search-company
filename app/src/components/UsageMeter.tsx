@@ -9,13 +9,14 @@ import { cn } from 'src/lib/utils'
 import { useApiKeyStore } from 'src/store/apiKeyStore'
 import { useUsageStore } from 'src/store/usageStore'
 
+const REFRESH_DELAY_MS = 400
+
 export default function UsageMeter() {
 	const { usage, error, refresh } = useUsageStore()
 	const apiKey = useApiKeyStore((state) => state.apiKey.trim())
 
-	// O uso também conta o que outras contas fizeram com a chave informada. Espera parar de digitar para atualizar.
 	useEffect(() => {
-		const timer = setTimeout(refresh, 400)
+		const timer = setTimeout(refresh, REFRESH_DELAY_MS)
 		return () => clearTimeout(timer)
 	}, [refresh, apiKey])
 

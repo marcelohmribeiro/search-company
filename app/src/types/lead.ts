@@ -8,7 +8,6 @@ export type SiteStatus =
 
 export type LeadStatus = 'NEW' | 'IN_PROGRESS' | 'CONTACTED' | 'REPLIED' | 'CLOSED' | 'DISCARDED'
 
-/** `businessStatus` do Google. */
 export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'FUTURE_OPENING'
 
 export type LeadOrder = 'reviews' | 'rating' | 'name' | 'recent'

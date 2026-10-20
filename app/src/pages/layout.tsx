@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { KeyRound, LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
+import ThemeToggle from 'src/components/ThemeToggle'
 import UsageMeter from 'src/components/UsageMeter'
 import { Button } from 'src/components/ui/button'
 import { Toaster } from 'src/components/ui/sonner'
@@ -23,8 +24,6 @@ export default function Layout() {
 	const { user, signOut, setUser } = useAuthStore()
 	const navItems = user?.role === 'ADMIN' ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS
 
-	// Ao abrir o app: traz o papel atualizado e registra a entrada (o painel admin mostra).
-	// Um 401 aqui já encerra a sessão pelo interceptor; outros erros não impedem o uso.
 	useEffect(() => {
 		fetchMe()
 			.then(setUser)
@@ -68,6 +67,7 @@ export default function Layout() {
 							<div className='flex-1 sm:flex-none'>
 								<UsageMeter />
 							</div>
+							<ThemeToggle />
 							<Tooltip>
 								<TooltipTrigger asChild>
 									<Button variant='ghost' size='icon-sm' onClick={signOut} aria-label='Sair'>
@@ -84,11 +84,6 @@ export default function Layout() {
 					<Outlet />
 				</main>
 
-				<footer className='border-t bg-background'>
-					<div className='mx-auto max-w-7xl px-4 py-4 text-xs text-muted-foreground sm:px-6'>
-						Dados das empresas: Google Maps
-					</div>
-				</footer>
 			</div>
 			<Toaster position='bottom-right' />
 		</TooltipProvider>

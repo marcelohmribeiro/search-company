@@ -6,13 +6,12 @@ export async function fetchApiTokens() {
 	return data
 }
 
-/** Cria um token pessoal. A resposta é a única vez em que o valor completo aparece. */
+/** Cria um token; só esta resposta traz o valor completo. */
 export async function createApiToken(name: string) {
 	const { data } = await api.post<CreatedApiToken>('/me/tokens', { name })
 	return data
 }
 
-/** Revoga o token: ele para de funcionar na hora. */
 export async function revokeApiToken(id: number) {
 	await api.delete(`/me/tokens/${id}`)
 }

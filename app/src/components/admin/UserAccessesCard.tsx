@@ -5,7 +5,7 @@ import { Skeleton } from 'src/components/ui/skeleton'
 import { formatDate, formatDateTime, formatTime } from 'src/lib/format'
 import type { UserAccess } from 'src/types'
 
-/** Até quando a entrada durou: só a hora no mesmo dia, data e hora se passou da meia-noite. */
+/** Fim da entrada: só a hora no mesmo dia, ou data e hora. */
 function accessEnd({ startedAt, lastSeenAt }: UserAccess) {
 	if (formatTime(startedAt) === formatTime(lastSeenAt) && formatDate(startedAt) === formatDate(lastSeenAt)) return null
 	return formatDate(startedAt) === formatDate(lastSeenAt) ? formatTime(lastSeenAt) : formatDateTime(lastSeenAt)

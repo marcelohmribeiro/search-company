@@ -6,10 +6,6 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Label } from 'src/components/ui/label'
 import { useApiKeyStore } from 'src/store/apiKeyStore'
 
-/**
- * Chave da API do Google de quem está buscando. Fica só neste navegador (na memória ou, com "Lembrar",
- * no localStorage) e vai junto de cada busca; o backend não a guarda.
- */
 export default function GoogleApiKeyField({ disabled }: { disabled: boolean }) {
 	const { apiKey, remember, setApiKey, setRemember } = useApiKeyStore()
 	const [showKey, setShowKey] = useState(false)

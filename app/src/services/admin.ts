@@ -11,7 +11,7 @@ export async function fetchAdminUser(id: number) {
 	return data
 }
 
-/** Empresas do usuário, as que entraram na lista dele mais recentemente primeiro, sem filtro. */
+/** Leads do usuário, os mais recentes primeiro. */
 export async function fetchAdminUserLeads(id: number, page: number, pageSize: number) {
 	const { data } = await api.get<LeadPage>(`/admin/users/${id}/leads`, { params: { page, pageSize, orderBy: 'recent' } })
 	return data

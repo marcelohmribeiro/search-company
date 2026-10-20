@@ -1,7 +1,6 @@
 import type { UserRole } from './auth'
 import type { Usage } from './search'
 
-/** Usuário com os números dele, no painel admin. */
 export interface AdminUser {
 	id: number
 	username: string
@@ -14,7 +13,7 @@ export interface AdminUser {
 	usage: Usage
 }
 
-/** Uma entrada no app. Aberturas com menos de 30 minutos de intervalo contam como a mesma entrada. */
+/** Aberturas com menos de 30 minutos entre si contam como uma entrada. */
 export interface UserAccess {
 	id: number
 	startedAt: string

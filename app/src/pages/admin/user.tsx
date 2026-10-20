@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, CircleAlert } from 'lucide-react'
 import UserAccessesCard from 'src/components/admin/UserAccessesCard'
@@ -10,8 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/c
 import { Skeleton } from 'src/components/ui/skeleton'
 import { ROLE_LABELS } from 'src/constants/labels'
 import { formatDate, formatDateTime, formatNumber } from 'src/lib/format'
-import { fetchAdminUser, fetchAdminUserAccesses, fetchAdminUserLeads, getErrorMessage } from 'src/services'
-import type { AdminUser, LeadPage, UserAccess } from 'src/types'
+import { useApi } from 'src/hooks'
+import { fetchAdminUser, fetchAdminUserAccesses, fetchAdminUserLeads } from 'src/services'
 
 const PAGE_SIZE = 25
 
@@ -32,26 +32,13 @@ function Stat({ label, value, hint }: { label: string; value: string | null; hin
 }
 
 function AdminUserView({ userId }: { userId: number }) {
-	const [user, setUser] = useState<AdminUser | null>(null)
-	const [accesses, setAccesses] = useState<UserAccess[] | null>(null)
-	const [leads, setLeads] = useState<LeadPage | null>(null)
 	const [page, setPage] = useState(1)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		Promise.all([fetchAdminUser(userId), fetchAdminUserAccesses(userId)])
-			.then(([summary, list]) => {
-				setUser(summary)
-				setAccesses(list)
-			})
-			.catch((loadError) => setError(getErrorMessage(loadError)))
-	}, [userId])
-
-	useEffect(() => {
-		fetchAdminUserLeads(userId, page, PAGE_SIZE)
-			.then(setLeads)
-			.catch((loadError) => setError(getErrorMessage(loadError)))
-	}, [userId, page])
+	const summary = useApi(useCallback(() => fetchAdminUser(userId), [userId]))
+	const accessList = useApi(useCallback(() => fetchAdminUserAccesses(userId), [userId]))
+	const leadPage = useApi(useCallback(() => fetchAdminUserLeads(userId, page, PAGE_SIZE), [userId, page]))
+	const user = summary.data
+	const leads = leadPage.data
+	const error = summary.error ?? accessList.error ?? leadPage.error
 
 	const back = (
 		<Button variant='outline' asChild>
@@ -108,13 +95,12 @@ function AdminUserView({ userId }: { userId: number }) {
 						<UserLeadsTable data={leads} refreshing={leads !== null && leads.page !== page} onPageChange={setPage} />
 					</div>
 				</Card>
-				<UserAccessesCard accesses={accesses} />
+				<UserAccessesCard accesses={accessList.data} />
 			</div>
 		</div>
 	)
 }
 
-// A `key` recomeça a tela do zero ao trocar de usuário, sem dados do anterior.
 export default function AdminUser() {
 	const { id } = useParams()
 	return <AdminUserView key={id} userId={Number(id)} />
