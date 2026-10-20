@@ -9,6 +9,7 @@ import Layout from 'src/pages/layout'
 import Leads from 'src/pages/leads'
 import Login from 'src/pages/login'
 import Register from 'src/pages/register'
+import Tokens from 'src/pages/tokens'
 
 export const router = createBrowserRouter([
 	{ path: '/login', element: <Login /> },
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
 				children: [
 					{ index: true, element: <Index /> },
 					{ path: 'leads', element: <Leads /> },
+					{ path: 'tokens', element: <Tokens /> },
 					{
 						path: 'admin',
 						element: <RequireAdmin />,

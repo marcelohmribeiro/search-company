@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
+import { KeyRound, LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
 import UsageMeter from 'src/components/UsageMeter'
 import { Button } from 'src/components/ui/button'
 import { Toaster } from 'src/components/ui/sonner'
@@ -13,6 +13,7 @@ import { useLeadsViewStore } from 'src/store/leadsViewStore'
 const NAV_ITEMS = [
 	{ to: '/', label: 'Buscar', icon: Search, end: true },
 	{ to: '/leads', label: 'Leads', icon: Users, end: false },
+	{ to: '/tokens', label: 'Tokens', icon: KeyRound, end: false },
 ]
 
 const ADMIN_NAV_ITEM = { to: '/admin', label: 'Admin', icon: ShieldCheck, end: false }
@@ -22,7 +23,7 @@ export default function Layout() {
 	const { user, signOut, setUser } = useAuthStore()
 	const navItems = user?.role === 'ADMIN' ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS
 
-	// Ao abrir o app: traz papel e chave do Google atualizados e registra a entrada (o painel admin mostra).
+	// Ao abrir o app: traz o papel atualizado e registra a entrada (o painel admin mostra).
 	// Um 401 aqui já encerra a sessão pelo interceptor; outros erros não impedem o uso.
 	useEffect(() => {
 		fetchMe()

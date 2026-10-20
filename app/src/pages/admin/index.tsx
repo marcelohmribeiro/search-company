@@ -22,7 +22,7 @@ export default function AdminUsers() {
 		<div className='space-y-6'>
 			<PageHeader
 				title='Usuários'
-				description='Quem usa o app, as empresas de cada um e quando entrou. Usuários novos são criados pelo terminal.'
+				description='Quem usa o app, as empresas de cada um e quando entrou.'
 			/>
 
 			{error ? (
