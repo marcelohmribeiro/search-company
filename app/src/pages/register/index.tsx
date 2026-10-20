@@ -74,7 +74,6 @@ export default function Register() {
 									required
 									autoFocus
 								/>
-								<FieldDescription>De 3 a 30 caracteres: letras sem acento, números, ponto, hífen ou sublinhado.</FieldDescription>
 							</Field>
 							<Field>
 								<FieldLabel htmlFor='password'>Senha</FieldLabel>
