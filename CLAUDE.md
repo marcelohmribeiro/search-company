@@ -233,7 +233,7 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
   - Valem **só** nas rotas de `/leads`, que usam `verifyJWTOrApiToken`. Em qualquer outra rota (buscas, uso, `/me`, `/me/tokens`, admin), o `verifyJWT` responde 401. Por isso um token nunca faz buscas nem gasta requisições, mesmo sendo de um admin.
   - Rota nova continua com `verifyJWT`. Só use `verifyJWTOrApiToken` numa rota que o Claude precise chamar e que não gaste requisições.
   - Revogar apaga o token, e ele para de funcionar na hora. O último uso é gravado no máximo uma vez por minuto.
-  - A skill `proposta-site` (`~/.claude/skills/proposta-site`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do `~/.zshrc`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e tira das anotações o link do site de demonstração.
+  - A skill `proposta-site` (`~/.claude/skills/proposta-site`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do bloco `env` do `~/.claude/settings.json`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e tira das anotações o link do site de demonstração.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
 - **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
@@ -299,7 +299,7 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
     - `{instagram}` vira o perfil da empresa quando o site no Google é o Instagram ("Só Instagram"); `{google_fotos_link}` vira o link das fotos no Maps, ou o da página no Maps.
     - O que faltar continua como marcador no texto, e um aviso pede para completar.
   - Na tabela, o status pode ser trocado direto. O painel lateral de detalhes tem anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações.
-- **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como as duas linhas `export` para o `~/.zshrc` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
+- **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como o bloco `env` para o `~/.claude/settings.json` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
   - lista dos usuários com empresas, buscas, requisições no mês, entradas e último acesso;
   - página de cada usuário (`/admin/users/:id`) com esses números, as empresas dele (só leitura, das mais recentes) e as entradas no app.

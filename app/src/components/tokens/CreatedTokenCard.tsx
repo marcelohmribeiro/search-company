@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/c
 import { settings } from 'src/config'
 import type { CreatedApiToken } from 'src/types'
 
-/** Linhas para o `~/.zshrc`: a skill `proposta-site` lê a API e o token dessas variáveis. */
+/** Bloco `env` do `~/.claude/settings.json`: a skill `proposta-site` lê a API e o token dessas variáveis. */
 const envSnippet = (token: string) =>
-	`export SEARCH_COMPANY_API_URL="${settings.API_URL}"\nexport SEARCH_COMPANY_TOKEN="${token}"`
+	JSON.stringify({ env: { SEARCH_COMPANY_API_URL: settings.API_URL, SEARCH_COMPANY_TOKEN: token } }, null, 2)
 
-/** Mostra o token recém-criado uma única vez, já no formato para colar no terminal. */
+/** Mostra o token recém-criado uma única vez, já no formato do `settings.json` do Claude Code. */
 export default function CreatedTokenCard({ created, onDone }: { created: CreatedApiToken; onDone: () => void }) {
 	const [copied, setCopied] = useState(false)
 	const snippet = envSnippet(created.token)
@@ -37,8 +37,9 @@ export default function CreatedTokenCard({ created, onDone }: { created: Created
 			<CardContent className='space-y-3'>
 				<pre className='overflow-x-auto rounded-md border bg-background p-3 text-xs'>{snippet}</pre>
 				<p className='text-sm text-muted-foreground'>
-					Cole essas duas linhas no final do <code className='font-mono'>~/.zshrc</code> e abra um terminal novo. Depois é só
-					pedir ao Claude algo como "faz as propostas dos leads que estão fazendo".
+					Coloque as duas variáveis no bloco <code className='font-mono'>env</code> do{' '}
+					<code className='font-mono'>~/.claude/settings.json</code> (se o bloco já existir, junte com o que tem lá) e abra uma
+					sessão nova do Claude Code. Depois é só pedir algo como "faz as propostas dos leads que estão fazendo".
 				</p>
 				<div className='flex gap-2'>
 					<Button onClick={copy}>
