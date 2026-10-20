@@ -9,10 +9,13 @@ const loginSchema = z.object({
 	password: z.string({ error: "Informe a senha." }).min(1, "Informe a senha."),
 });
 
-/** Dados do script de cadastro (`bun run user:create`). */
-const userSchema = z.object({
+/** Corpo de `POST /auth/register`. */
+const registerSchema = z.object({
 	email,
-	password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
+	password: z
+		.string({ error: "Informe a senha." })
+		.min(8, "A senha precisa ter pelo menos 8 caracteres.")
+		.max(200, "A senha pode ter no máximo 200 caracteres."),
 });
 
-export { loginSchema, userSchema };
+export { loginSchema, registerSchema };

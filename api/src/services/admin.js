@@ -7,15 +7,13 @@ const SUMMARY_SELECT = {
 	email: true,
 	role: true,
 	createdAt: true,
-	googleApiKeyHash: true,
 	_count: { select: { leads: true, searches: true, accesses: true } },
 	accesses: { orderBy: { lastSeenAt: "desc" }, take: 1, select: { lastSeenAt: true } },
 };
 
-async function toSummary({ googleApiKeyHash, _count, accesses, ...user }) {
+async function toSummary({ _count, accesses, ...user }) {
 	return {
 		...user,
-		hasGoogleApiKey: Boolean(googleApiKeyHash),
 		leadsCount: _count.leads,
 		searchesCount: _count.searches,
 		accessesCount: _count.accesses,

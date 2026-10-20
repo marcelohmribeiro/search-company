@@ -1,9 +1,8 @@
 import { prisma } from "./prisma.js";
 import { searchText } from "./places.js";
 import { getUsage, reserveRequest, finishRequest } from "./usage.js";
-import { getGoogleApiKey } from "./users.js";
 import { settings } from "#src/config";
-import { classifySite, httpError } from "#src/utils";
+import { classifySite, fingerprint, httpError } from "#src/utils";
 
 const NEIGHBORHOOD_TYPES = ["sublocality_level_1", "sublocality", "neighborhood"];
 
@@ -170,18 +169,19 @@ async function fetchPage({ searchId, page, textQuery, pageToken, userId, apiKey,
 }
 
 /**
- * Roda uma busca do usuário (uma combinação categoria × bairro × cidade) na Places API, com a chave do Google
- * salva por ele, página por página, e grava os leads de cada página no banco. A busca para no limite do mês,
- * no primeiro erro ou quando não há próxima página. Não há nova tentativa.
+ * Roda uma busca do usuário (uma combinação categoria × bairro × cidade) na Places API, página por página, e
+ * grava os leads de cada página no banco. A busca para no limite do mês, no primeiro erro ou quando não há
+ * próxima página. Não há nova tentativa.
  * @param {number} userId
  * @param {{ city: string, category: string, neighborhood?: string, maxPages: number, skipIfDone: boolean }} input
+ * @param {string} apiKey Chave do Google enviada pelo navegador. Só é repassada ao Google: não vai para o banco
+ * nem para o log. O banco guarda apenas o `fingerprint` dela, que conta o uso do mês por chave.
  * @returns {Promise<{ skipped: boolean, search: object, usage: object }>} Com `skipped`, `search` é a
  * busca anterior do usuário e nenhuma requisição é feita.
- * @throws 400 sem chave do Google salva, 409 com outra busca do usuário em andamento, 429 com o limite do mês
- * atingido.
+ * @throws 409 com outra busca do usuário em andamento, 429 com o limite do mês atingido.
  */
-async function runSearch(userId, { city, category, neighborhood, maxPages, skipIfDone }) {
-	const { apiKey, keyHash } = await getGoogleApiKey(userId);
+async function runSearch(userId, { city, category, neighborhood, maxPages, skipIfDone }, apiKey) {
+	const keyHash = fingerprint(apiKey);
 
 	if (runningSearches.has(userId)) {
 		throw httpError(409, "Você já tem uma busca em andamento.");
@@ -193,10 +193,10 @@ async function runSearch(userId, { city, category, neighborhood, maxPages, skipI
 
 		if (skipIfDone) {
 			const previous = await findCompletedSearch(userId, textQuery, maxPages);
-			if (previous) return { skipped: true, search: previous, usage: await getUsage(userId) };
+			if (previous) return { skipped: true, search: previous, usage: await getUsage(userId, keyHash) };
 		}
 
-		const usage = await getUsage(userId);
+		const usage = await getUsage(userId, keyHash);
 		if (usage.remaining <= 0) {
 			throw httpError(429, `Limite de ${usage.limit} requisições do mês ${usage.period} atingido.`);
 		}
@@ -246,7 +246,7 @@ async function runSearch(userId, { city, category, neighborhood, maxPages, skipI
 			},
 		});
 
-		return { skipped: false, search: finished, usage: await getUsage(userId) };
+		return { skipped: false, search: finished, usage: await getUsage(userId, keyHash) };
 	} finally {
 		runningSearches.delete(userId);
 	}

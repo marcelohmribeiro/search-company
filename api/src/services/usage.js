@@ -19,7 +19,8 @@ function currentPeriod() {
 
 /**
  * Requisições que contam no mês do usuário: as que ele fez, com qualquer chave, e as feitas com a chave
- * atual dele, por qualquer conta. Assim, trocar de chave ou passar uma chave para outra conta não zera o uso.
+ * que ele está usando, por qualquer conta. Assim, trocar de chave ou usar a mesma chave em outra conta não
+ * zera o uso.
  */
 function usageWhere(period, userId, keyHash) {
 	return { period, OR: keyHash ? [{ userId }, { keyHash }] : [{ userId }] };
@@ -27,12 +28,14 @@ function usageWhere(period, userId, keyHash) {
 
 /**
  * Uso da Places API do usuário no mês de cobrança atual.
+ * @param {number} userId
+ * @param {string} [keyHash] `fingerprint` da chave que o usuário tem no navegador. Sem ela, só contam as
+ * requisições feitas por ele.
  * @returns {Promise<{ period: string, used: number, limit: number, remaining: number }>}
  */
-async function getUsage(userId) {
+async function getUsage(userId, keyHash) {
 	const period = currentPeriod();
-	const user = await prisma.user.findUnique({ where: { id: userId }, select: { googleApiKeyHash: true } });
-	const used = await prisma.apiRequest.count({ where: usageWhere(period, userId, user?.googleApiKeyHash) });
+	const used = await prisma.apiRequest.count({ where: usageWhere(period, userId, keyHash) });
 	const limit = settings.MONTHLY_REQUEST_LIMIT;
 	return { period, used, limit, remaining: Math.max(limit - used, 0) };
 }

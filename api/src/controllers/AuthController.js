@@ -1,5 +1,5 @@
-import { authenticate } from "#src/services";
-import { loginSchema } from "#src/schemas";
+import { authenticate, register as registerUser } from "#src/services";
+import { loginSchema, registerSchema } from "#src/schemas";
 
 const AuthController = () => {
   async function login(req, res, next) {
@@ -12,8 +12,19 @@ const AuthController = () => {
     }
   }
 
+  async function register(req, res, next) {
+    try {
+      const data = await registerUser(registerSchema.parse(req.body ?? {}));
+
+      return res.status(201).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   return {
     login,
+    register,
   };
 };
 

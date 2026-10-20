@@ -9,11 +9,10 @@ A cidade é **livre**: o usuário informa na interface a cidade, as categorias e
 A conta tem **1.000 requisições grátis por mês** de Text Search Enterprise. Passar disso gera cobrança no cartão.
 
 - **Nunca faça uma requisição real à Places API sem autorização explícita do usuário.** Isso vale para qualquer chamada: teste "grátis" (só IDs), `curl`, script ou o próprio app. Para testar, use o mock (ver "Testes").
-- **Cada usuário salva a própria chave da API do Google**, na tela de busca. Ela fica na conta dele, no banco (`User.googleApiKey`), e vale para todas as buscas dele.
-  - A chave é gravada **cifrada** com AES-256-GCM, usando o `ENCRYPTION_KEY` do `.env` (`src/utils/_secret.js`). Quem vê só o banco (painel do Supabase, dump, `DATABASE_URL` vazada) não consegue usá-la.
-  - Ela nunca volta para o front: a API só diz se existe e os 4 últimos caracteres. Também não vai para o log.
-  - `User.googleApiKeyHash` (SHA-256) impede a mesma chave em duas contas.
-  - **Nunca leia, imprima ou peça a chave real**: nem decifrando a do banco, nem da linha `GOOGLE_API_KEY` que possa ter sobrado no `api/.env`, que não é mais usada.
+- **A chave da API do Google fica no navegador de cada usuário.** Ele a digita na tela de busca (`src/store/apiKeyStore.ts`). Com "Lembrar neste navegador", ela vai para o `localStorage`; sem isso, fica só na memória até recarregar.
+  - Ela vai no header `X-Google-Api-Key` de `POST /searches` (e, opcionalmente, de `GET /usage`). O backend só a repassa ao Google: ela não vai para o banco nem para o log.
+  - O banco guarda só o SHA-256 dela (`ApiRequest.keyHash`, pelo `fingerprint` de `src/utils/_fingerprint.js`), para contar o uso por chave.
+  - **Nunca leia, imprima ou peça a chave real**: nem do navegador do usuário, nem da linha `GOOGLE_API_KEY` que possa ter sobrado no `api/.env`, que não é mais usada.
 - **Cada usuário tem os próprios 990 por mês.** A trava é **rígida em 990**: com 990 requisições usadas no mês, o backend recusa novas buscas desse usuário até virar o mês.
   - O teto fica em `HARD_REQUEST_LIMIT`, em `api/src/config/settings.js`.
   - O `MONTHLY_REQUEST_LIMIT` do `.env` só consegue baixar esse valor.
@@ -21,7 +20,7 @@ A conta tem **1.000 requisições grátis por mês** de Text Search Enterprise. 
 Como a trava funciona (`api/src/services/usage.js` e `search.js`):
 
 - **O contador fica no banco.** Cada chamada HTTP à Places API vira uma linha em `ApiRequest`, com o usuário e o hash da chave usada.
-  - O uso do mês de um usuário conta as linhas dele **e** as feitas com a chave atual dele, por qualquer conta. Assim, trocar de chave ou passar uma chave para outra conta não zera o uso.
+  - O uso do mês de um usuário conta as linhas dele **e** as feitas com a chave que ele está usando (a do header), por qualquer conta. Assim, trocar de chave ou usar a mesma chave em outra conta não zera o uso.
   - As requisições de antes das contas (sem `keyHash`) contam pelo `userId`.
 - **A linha é criada antes da chamada.** `reserveRequest` cria a linha antes de a requisição sair. Depois, `finishRequest` grava o resultado. A linha conta mesmo que a chamada falhe ou o processo caia no meio.
 - **Cada página é uma requisição.** Uma busca de 3 páginas gasta 3, e o limite é conferido antes de **cada** página.
@@ -40,7 +39,7 @@ O sistema usa a API oficial, sem scraping do Maps, que vai contra os termos do G
 ```
 POST https://places.googleapis.com/v1/places:searchText
 Content-Type: application/json
-X-Goog-Api-Key: <chave salva pelo usuário, decifrada>
+X-Goog-Api-Key: <chave enviada pelo navegador no header X-Google-Api-Key>
 X-Goog-FieldMask: <FIELD_MASK de api/src/services/places.js>
 
 {
@@ -149,12 +148,9 @@ O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois d
   - `DATABASE_URL`: local, `postgresql://search:search@localhost:5432/search_company`; no Supabase, a URL do Session pooler com `?sslmode=require` (ver "Banco no Supabase").
   - `PORT` (3333) e `FRONTEND_URL` (`http://localhost:5173`).
   - `JWT_SECRET`: segredo que assina os tokens. **Obrigatório**: sem ele, a API não sobe. Na Vercel, cadastre o mesmo tipo de valor (um segredo longo e aleatório).
-  - `ENCRYPTION_KEY`: 64 caracteres hexadecimais que cifram as chaves do Google salvas. **Obrigatório**: sem ele, a API não sobe.
-    - Tem de ser **o mesmo** no `api/.env` e na Vercel, porque os dois usam o mesmo banco. Com outro valor, as chaves salvas não podem mais ser lidas, e cada usuário precisa salvar a dele de novo.
-    - Não confunda com a chave do Google: o nome é diferente de propósito.
   - Opcionais: `MONTHLY_REQUEST_LIMIT` (só baixa o teto de 990), `REQUESTS_PER_MINUTE` (padrão 10) e `PLACES_API_URL` (para apontar a um mock).
 - `app/.env`: `VITE_APP_NAME` e `VITE_API_URL` (`http://localhost:3333`).
-- Os dois `.env` estão no `.gitignore`. A chave do Google não está em nenhum deles: cada usuário a salva na própria conta.
+- Os dois `.env` estão no `.gitignore`. A chave do Google não está em nenhum deles: cada usuário a informa no próprio navegador.
 
 ### Convenções
 
@@ -209,7 +205,6 @@ Tudo o que a API devolve é guardado. A filtragem (tem site, fechada, nota etc.)
 - **`User`**: quem pode entrar no app.
   - E-mail (sempre em minúsculas) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
   - `role`: `ADMIN` ou `USER`.
-  - `googleApiKey` (cifrada) e `googleApiKeyHash` (único).
 - **`UserAccess`**: as entradas de cada usuário no app (`startedAt` e `lastSeenAt`). Cada `GET /me`, que o front chama ao abrir o app, registra uma entrada; aberturas com menos de 30 minutos de intervalo estendem a mesma.
 
 ### Classificação do `websiteUri` (`api/src/utils/_classifySite.js`)
@@ -228,12 +223,10 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
 ### Autenticação
 
 - **Login por e-mail e senha.** `POST /auth/login` confere a senha e devolve `{ token, user }`. O token é um JWT com `{ id }`, válido por 7 dias.
-- **Não há cadastro pela API.** Usuários só são criados pelo terminal, em `api/`, com `bun run user:create [email] [--admin]`:
-  - o script mostra em qual banco vai gravar (só o host), pede a senha duas vezes sem mostrá-la e exige pelo menos 8 caracteres;
-  - sem `--admin`, um usuário novo é comum; com `--admin`, ele (ou o existente) vira administrador;
-  - se o e-mail já existe, ele troca a senha e mantém o papel, a menos que venha `--admin`;
-  - ele grava no banco da `DATABASE_URL` do `.env`. Para criar o usuário de produção, aponte para o Supabase.
-- **Rotas protegidas:** todas, menos `POST /auth/login` e `GET /`, passam pelo `verifyJWT` (`src/middlewares/auth.js`). Sem token, ou com token inválido ou expirado, a resposta é 401 `{ message }`.
+- **Cadastro aberto no app** (`/register`). `POST /auth/register` com `{ email, password }` cria um usuário comum (`USER`) e já devolve `{ token, user }`, como o login.
+  - A senha precisa ter de 8 a 200 caracteres. E-mail que já tem conta responde 409.
+  - Não há script de terminal para criar usuários. Para tornar alguém admin, altere o `role` dele direto no banco.
+- **Rotas protegidas:** todas, menos `POST /auth/login`, `POST /auth/register` e `GET /`, passam pelo `verifyJWT` (`src/middlewares/auth.js`). Sem token, ou com token inválido ou expirado, a resposta é 401 `{ message }`.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
 - **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
@@ -245,19 +238,20 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
   - o `RequireAuth` manda quem não tem sessão para `/login?next=<página>`, e depois do login volta para ela (o `next` só aceita caminhos do próprio app);
   - token vencido ou sem formato de JWT conta como sem sessão (`src/lib/token.ts` lê o `exp`). A assinatura só a API confere: um token falso com prazo abre a tela, mas a primeira chamada volta 401 e encerra a sessão;
   - o botão "Sair" fica no cabeçalho;
-  - ao abrir o app, o `Layout` chama `GET /me`, que atualiza o papel e a chave no `authStore` e registra a entrada;
+  - o login tem o link "Criar conta" e o cadastro tem "Entrar", os dois mantendo o `next`;
+  - ao abrir o app, o `Layout` chama `GET /me`, que atualiza o papel no `authStore` e registra a entrada;
   - o link "Admin" só aparece para o admin, e o `RequireAdmin` manda os outros de volta para a busca.
 
 ### Endpoints do backend
 
-Todos, menos `POST /auth/login` e `GET /`, exigem o header `Authorization: Bearer <token>`.
+Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o header `Authorization: Bearer <token>`.
 
 - `POST /auth/login` com `{ email, password }`: devolve `{ token, user }`, ou 401 com e-mail ou senha errados.
-- `GET /me`: o usuário logado, `{ id, email, role, hasGoogleApiKey, googleApiKeyEnd }`. Registra uma entrada no app.
-- `PUT /me/google-api-key` com `{ apiKey }`: salva a chave, cifrada. Responde 409 se ela já está em outra conta. `DELETE /me/google-api-key` remove.
-- `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`.
-- `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }`: roda **uma** combinação, com a chave salva do usuário.
-  - Sem chave salva, responde 400, antes de qualquer outra verificação.
+- `POST /auth/register` com `{ email, password }`: cria a conta (`USER`) e devolve `{ token, user }`. 409 se o e-mail já tem conta.
+- `GET /me`: o usuário logado, `{ id, email, role }`. Registra uma entrada no app.
+- `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`. Com o header `X-Google-Api-Key`, inclui o que outras contas fizeram com a mesma chave, como a trava conta.
+- `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }` e o header `X-Google-Api-Key`: roda **uma** combinação com essa chave.
+  - Sem o header, responde 400.
   - Respostas: 201 com `{ skipped, search, usage }`, 409 com outra busca do usuário em andamento e 429 com a cota dele esgotada.
   - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
 - `GET /searches`: histórico do usuário, com as mais recentes primeiro.
@@ -276,7 +270,7 @@ Todos, menos `POST /auth/login` e `GET /`, exigem o header `Authorization: Beare
 ### Frontend
 
 - **Busca (`/`):**
-  - Chave da API do Google da conta (`src/components/search/GoogleApiKeyField.tsx`): sem chave, um campo para salvar; com chave, "Salva, termina em XXXX" com "Trocar" e "Remover". Ela não fica no navegador, e o `main.jsx` apaga a cópia que versões antigas guardavam no `localStorage`.
+  - Chave da API do Google (`src/components/search/GoogleApiKeyField.tsx`): um campo com "mostrar/esconder" e "Lembrar neste navegador". A barra de uso do cabeçalho se atualiza quando a chave muda.
   - Campos de cidade, categorias e bairros (um por linha), páginas por busca e "pular buscas já feitas".
   - Mostra a estimativa de custo (combinações × páginas) e pede confirmação num diálogo antes de rodar.
   - Roda as combinações em sequência, mostrando o andamento, e permite parar depois da atual. Também mostra o histórico.
@@ -297,7 +291,7 @@ Todos, menos `POST /auth/login` e `GET /`, exigem o header `Authorization: Beare
     - O que faltar continua como marcador no texto, e um aviso pede para completar.
   - Na tabela, o status pode ser trocado direto. O painel lateral de detalhes tem anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações.
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
-  - lista dos usuários com empresas, buscas, requisições no mês, entradas, último acesso e se têm chave do Google;
+  - lista dos usuários com empresas, buscas, requisições no mês, entradas e último acesso;
   - página de cada usuário (`/admin/users/:id`) com esses números, as empresas dele (só leitura, das mais recentes) e as entradas no app.
 - O cabeçalho mostra as requisições usadas no mês **pelo usuário** numa barra que muda de cor: verde, âmbar com menos de 100 restantes e vermelho quando a cota acaba.
 
@@ -307,8 +301,8 @@ Todos, menos `POST /auth/login` e `GET /`, exigem o header `Authorization: Beare
 
 - um banco separado, criado com `docker exec search-company-db createdb -U search search_company_test` e preparado com `DATABASE_URL=... bunx prisma migrate deploy`;
 - um mock HTTP da Text Search, apontado por `PLACES_API_URL`;
-- chaves falsas salvas pela tela ou por `PUT /me/google-api-key`, um `ENCRYPTION_KEY` próprio do teste e `MONTHLY_REQUEST_LIMIT` baixo;
-- usuários de teste criados com `bun run user:create` apontando para o banco de teste. A migration `users_own_leads` recusa rodar num banco com dados e sem nenhum usuário.
+- chaves falsas no header `X-Google-Api-Key` e `MONTHLY_REQUEST_LIMIT` baixo;
+- usuários de teste criados por `POST /auth/register` na API apontada para o banco de teste. A migration `users_own_leads` recusa rodar num banco com dados e sem nenhum usuário.
 
 Ao terminar, apague o banco de teste com `dropdb`.
 

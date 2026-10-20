@@ -1,5 +1,4 @@
-import { getMe, recordAccess, saveGoogleApiKey, removeGoogleApiKey } from "#src/services";
-import { googleApiKeySchema } from "#src/schemas";
+import { getMe, recordAccess } from "#src/services";
 
 const MeController = () => {
   // O front chama ao abrir o app: é assim que as entradas do usuário são registradas.
@@ -14,31 +13,8 @@ const MeController = () => {
     }
   }
 
-  async function saveGoogleKey(req, res, next) {
-    try {
-      const { apiKey } = googleApiKeySchema.parse(req.body ?? {});
-      const data = await saveGoogleApiKey(req.user.id, apiKey);
-
-      return res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async function removeGoogleKey(req, res, next) {
-    try {
-      const data = await removeGoogleApiKey(req.user.id);
-
-      return res.status(200).json(data);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   return {
     show,
-    saveGoogleKey,
-    removeGoogleKey,
   };
 };
 

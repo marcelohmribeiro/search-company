@@ -61,8 +61,8 @@ model ApiRequest {
   search       Search?          @relation(fields: [searchId], references: [id])
   userId       Int
   user         User             @relation(fields: [userId], references: [id])
-  /// HMAC da chave do Google usada (o mesmo de `User.googleApiKeyHash`). `null` nas requisições feitas antes
-  /// de a chave ficar no banco, que contam pelo `userId`.
+  /// SHA-256 da chave do Google usada, que o navegador manda a cada busca. A chave em si não é guardada.
+  /// `null` nas requisições feitas antes das contas, que contam pelo `userId`.
   keyHash      String?
 
   @@index([period])
@@ -178,23 +178,19 @@ model SearchLead {
 
 /// Quem pode usar o app. Só é criado pelo terminal (`bun run user:create`); não há cadastro pela API.
 model User {
-  id               Int          @id @default(autoincrement())
+  id           Int          @id @default(autoincrement())
   /// Sempre em minúsculas.
-  email            String       @unique
+  email        String       @unique
   /// "salt:hash" do scrypt, em hexadecimal. A senha nunca é guardada.
-  passwordHash     String
+  passwordHash String
   /// `ADMIN` também vê o painel com os usuários, as empresas e as entradas de cada um.
-  role             UserRole     @default(USER)
-  /// Chave da API do Google, cifrada com AES-256-GCM (`ENCRYPTION_KEY`). Nunca volta para o front.
-  googleApiKey     String?
-  /// HMAC-SHA256 da chave: impede a mesma chave em duas contas e conta o uso do mês por chave.
-  googleApiKeyHash String?      @unique
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  searches         Search[]
-  apiRequests      ApiRequest[]
-  leads            UserLead[]
-  accesses         UserAccess[]
+  role         UserRole     @default(USER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  searches     Search[]
+  apiRequests  ApiRequest[]
+  leads        UserLead[]
+  accesses     UserAccess[]
 }
 
 /// Uma entrada do usuário no app. Aberturas com menos de 30 minutos de intervalo contam como a mesma entrada.
