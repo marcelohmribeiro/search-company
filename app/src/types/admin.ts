@@ -4,7 +4,7 @@ import type { Usage } from './search'
 /** Usuário com os números dele, no painel admin. */
 export interface AdminUser {
 	id: number
-	email: string
+	username: string
 	role: UserRole
 	createdAt: string
 	leadsCount: number

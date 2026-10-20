@@ -19,7 +19,7 @@ export default function Register() {
 	const token = useAuthStore((state) => state.token)
 	const signIn = useAuthStore((state) => state.signIn)
 	const [searchParams] = useSearchParams()
-	const [email, setEmail] = useState('')
+	const [username, setUsername] = useState('')
 	const [password, setPassword] = useState('')
 	const [confirmation, setConfirmation] = useState('')
 	const [submitting, setSubmitting] = useState(false)
@@ -41,7 +41,7 @@ export default function Register() {
 		setSubmitting(true)
 		setError(null)
 		try {
-			const result = await register(email, password)
+			const result = await register(username, password)
 			signIn(result.token, result.user)
 		} catch (registerError) {
 			setError(getErrorMessage(registerError))
@@ -62,17 +62,19 @@ export default function Register() {
 					<form onSubmit={handleSubmit}>
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor='email'>E-mail</FieldLabel>
+								<FieldLabel htmlFor='username'>Usuário</FieldLabel>
 								<Input
-									id='email'
-									placeholder='voce@exemplo.com'
-									type='email'
+									id='username'
+									placeholder='seu.usuario'
 									autoComplete='username'
-									value={email}
-									onChange={(event) => setEmail(event.target.value)}
+									autoCapitalize='none'
+									spellCheck={false}
+									value={username}
+									onChange={(event) => setUsername(event.target.value)}
 									required
 									autoFocus
 								/>
+								<FieldDescription>De 3 a 30 caracteres: letras sem acento, números, ponto, hífen ou sublinhado.</FieldDescription>
 							</Field>
 							<Field>
 								<FieldLabel htmlFor='password'>Senha</FieldLabel>

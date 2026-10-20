@@ -78,7 +78,7 @@ function AdminUserView({ userId }: { userId: number }) {
 	return (
 		<div className='space-y-6'>
 			<PageHeader
-				title={user?.email ?? 'Usuário'}
+				title={user?.username ?? 'Usuário'}
 				description={user && `${ROLE_LABELS[user.role]} · no app desde ${formatDate(user.createdAt)}`}
 				actions={back}
 			/>

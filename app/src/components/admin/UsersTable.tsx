@@ -24,7 +24,7 @@ export default function UsersTable({ users }: { users: AdminUser[] }) {
 						<TableCell className='pl-4'>
 							<div className='flex items-center gap-2'>
 								<Link to={`/admin/users/${user.id}`} className='font-medium hover:underline'>
-									{user.email}
+									{user.username}
 								</Link>
 								{user.role === 'ADMIN' && <Badge variant='secondary'>{ROLE_LABELS.ADMIN}</Badge>}
 							</div>

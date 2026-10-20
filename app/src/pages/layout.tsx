@@ -73,7 +73,7 @@ export default function Layout() {
 										<LogOut />
 									</Button>
 								</TooltipTrigger>
-								<TooltipContent>Sair{user && ` (${user.email})`}</TooltipContent>
+								<TooltipContent>Sair{user && ` (${user.username})`}</TooltipContent>
 							</Tooltip>
 						</div>
 					</div>

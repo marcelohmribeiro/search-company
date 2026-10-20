@@ -17,7 +17,7 @@ export default function Login() {
 	const token = useAuthStore((state) => state.token)
 	const signIn = useAuthStore((state) => state.signIn)
 	const [searchParams] = useSearchParams()
-	const [email, setEmail] = useState('')
+	const [username, setUsername] = useState('')
 	const [password, setPassword] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -29,7 +29,7 @@ export default function Login() {
 		setSubmitting(true)
 		setError(null)
 		try {
-			const result = await login(email, password)
+			const result = await login(username, password)
 			signIn(result.token, result.user)
 		} catch (loginError) {
 			setError(getErrorMessage(loginError))
@@ -45,20 +45,21 @@ export default function Login() {
 						<MapPinned className='size-5' />
 					</div>
 					<CardTitle className='text-lg'>Search Company</CardTitle>
-					<CardDescription>Entre com o seu e-mail e senha.</CardDescription>
+					<CardDescription>Entre com o seu usuário e senha.</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<form onSubmit={handleSubmit}>
 						<FieldGroup>
 							<Field>
-								<FieldLabel htmlFor='email'>E-mail</FieldLabel>
+								<FieldLabel htmlFor='username'>Usuário</FieldLabel>
 								<Input
-									id='email'
-									placeholder='voce@exemplo.com'
-									type='email'
+									id='username'
+									placeholder='seu.usuario'
 									autoComplete='username'
-									value={email}
-									onChange={(event) => setEmail(event.target.value)}
+									autoCapitalize='none'
+									spellCheck={false}
+									value={username}
+									onChange={(event) => setUsername(event.target.value)}
 									required
 									autoFocus
 								/>
