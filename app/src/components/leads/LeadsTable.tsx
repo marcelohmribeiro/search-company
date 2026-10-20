@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Ellipsis, MapPin, MessageCircle, Maximize2, SearchX, StickyNote } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ellipsis, Images, MessageCircle, SearchX, StickyNote } from 'lucide-react'
+import InstagramIcon from 'src/components/icons/InstagramIcon'
 import LeadRating from 'src/components/leads/LeadRating'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
 import SiteStatusBadge from 'src/components/leads/SiteStatusBadge'
@@ -126,6 +127,8 @@ function LeadsTable({
 							))
 						: leads.map((lead) => {
 								const whatsapp = whatsappUrl(lead.internationalPhone)
+								const instagram = lead.siteStatus === 'INSTAGRAM_ONLY' ? lead.websiteUri : null
+								const photos = lead.photosUri ?? lead.googleMapsUri
 								const closed = lead.businessStatus && lead.businessStatus !== 'OPERATIONAL'
 								return (
 									<TableRow key={lead.id} onClick={() => onOpen(lead)}>
@@ -176,24 +179,21 @@ function LeadsTable({
 										</TableCell>
 										<TableCell className='pr-4' onClick={stopRowClick}>
 											<div className='flex justify-end gap-0.5'>
-												{lead.googleMapsUri && (
-													<IconLink href={lead.googleMapsUri} label='Abrir no Google Maps'>
-														<MapPin />
-													</IconLink>
-												)}
 												{whatsapp && (
 													<IconLink href={whatsapp} label='Conversar no WhatsApp'>
 														<MessageCircle className='text-green-600 dark:text-green-400' />
 													</IconLink>
 												)}
-												<Tooltip>
-													<TooltipTrigger asChild>
-														<Button variant='ghost' size='icon-sm' onClick={() => onOpen(lead)} aria-label='Ver detalhes'>
-															<Maximize2 />
-														</Button>
-													</TooltipTrigger>
-													<TooltipContent>Ver detalhes</TooltipContent>
-												</Tooltip>
+												{instagram && (
+													<IconLink href={instagram} label='Abrir o Instagram'>
+														<InstagramIcon className='text-pink-600 dark:text-pink-400' />
+													</IconLink>
+												)}
+												{photos && (
+													<IconLink href={photos} label='Ver fotos no Google'>
+														<Images />
+													</IconLink>
+												)}
 											</div>
 										</TableCell>
 									</TableRow>

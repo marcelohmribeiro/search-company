@@ -314,6 +314,7 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Paginação na API (`page`, `pageSize` até 100). A tela oferece 25, 50 ou 100 linhas por página e números de página com reticências; no celular mostra "2 de 6".
   - Empresas que não estão funcionando aparecem com um aviso em vermelho embaixo do nome.
   - Clicar em qualquer parte da linha abre os detalhes da empresa no painel lateral (`LeadDetailSheet`), com anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações. O status pode ser trocado direto na tabela: o select, os links e os botões da linha não abrem o painel.
+  - A coluna Ações tem só atalhos: WhatsApp (com telefone), Instagram (quando o site no Google é o Instagram) e fotos no Google (`photosUri`, ou a página no Maps).
   - A tabela e os filtros são memorizados (`memo`) e recebem funções estáveis (`useCallback`), para abrir e fechar o painel não redesenhar todas as linhas.
 - **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como o bloco `env` para o `~/.claude/settings.json` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
