@@ -7,7 +7,6 @@ const { show } = MeController();
 const { findAll, create, remove } = ApiTokenController();
 
 MeRouter.get("/", verifyJWT, show);
-// Só com a sessão do app: um token pessoal não cria nem revoga tokens.
 MeRouter.get("/tokens", verifyJWT, findAll);
 MeRouter.post("/tokens", verifyJWT, create);
 MeRouter.delete("/tokens/:id", verifyJWT, remove);

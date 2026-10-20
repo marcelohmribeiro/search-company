@@ -1,44 +1,31 @@
 import { ZodError } from "zod";
 
-function handleError(error, req, res, next) {
-	console.error(`[${new Date().toISOString()}] Erro em ${req.method} ${req.originalUrl}`);
-	console.error(error);
+const PRISMA_ERRORS = {
+	P2002: [409, "Já existe um registro com esse valor."],
+	P2003: [400, "Referência inválida."],
+	P2025: [404, "Registro não encontrado."],
+};
 
-	if (error instanceof ZodError) {
-		return res.status(400).json({ error: describeZodError(error) });
-	}
-
-	// Prisma — erros conhecidos (foreign key, unique constraint, etc.)
-	if (error.code?.startsWith("P")) {
-		return handlePrismaError(error, res);
-	}
-
-	// Erro genérico não mapeado — nunca vaza detalhes internos pro cliente
-	return res.status(error.status || 500).json({
-		error: error.status ? error.message : "Erro interno do servidor",
-	});
-}
-
-// Mostra só o primeiro problema, com o campo de origem ("status", e não "status.1" de um item da lista).
+/** Primeiro problema da validação, no formato `"campo": mensagem`. */
 function describeZodError(error) {
 	const [issue] = error.issues;
 	const field = issue.path.filter((part) => typeof part === "string").join(".");
 	return field ? `"${field}": ${issue.message}` : issue.message;
 }
 
-function handlePrismaError(error, res) {
-	switch (error.code) {
-		case "P2002": // unique constraint
-			return res.status(409).json({
-				error: `Já existe um registro com esse ${error.meta?.target?.join(", ") || "valor"}.`,
-			});
-		case "P2003": // foreign key constraint
-			return res.status(400).json({ error: "Referência inválida — verifique os IDs informados." });
-		case "P2025": // registro não encontrado (ex: update/delete de algo que não existe)
-			return res.status(404).json({ error: "Registro não encontrado." });
-		default:
-			return res.status(500).json({ error: "Erro ao acessar o banco de dados." });
+/** Converte o erro em `{ error }` com o status HTTP. Erros não previstos viram 500 sem detalhes internos. */
+function handleError(error, req, res, next) {
+	console.error(`[${new Date().toISOString()}] Erro em ${req.method} ${req.originalUrl}`);
+	console.error(error);
+
+	if (error instanceof ZodError) return res.status(400).json({ error: describeZodError(error) });
+
+	if (error.code?.startsWith("P")) {
+		const [status, message] = PRISMA_ERRORS[error.code] ?? [500, "Erro ao acessar o banco de dados."];
+		return res.status(status).json({ error: message });
 	}
+
+	return res.status(error.status || 500).json({ error: error.status ? error.message : "Erro interno do servidor" });
 }
 
 export { handleError };

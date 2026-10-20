@@ -1,12 +1,5 @@
 import { settings } from "#src/config";
 
-// A requisição é cobrada pelo SKU mais caro entre os campos. Como `websiteUri` e telefones já a colocam
-// em Text Search Enterprise, todos os campos Essentials, Pro e Enterprise vêm sem custo extra.
-// Campos Enterprise + Atmosphere (reviews, editorialSummary, paymentOptions, serves*, delivery etc.)
-// ou `*` mudariam o SKU e não podem entrar.
-// `entrances`, `navigationPoints` e `searchUri` ficam de fora porque a documentação não define o SKU deles
-// de forma consistente.
-// Listas por SKU: https://developers.google.com/maps/billing-and-pricing/sku-details
 const ESSENTIALS_FIELDS = [
 	"places.id",
 	"places.name",
@@ -62,18 +55,12 @@ const ENTERPRISE_FIELDS = [
 	"places.websiteUri",
 ];
 
+/** Campos Essentials, Pro e Enterprise. Nunca use `*` nem campos Atmosphere: eles mudam o preço da requisição. */
 const FIELD_MASK = [...ESSENTIALS_FIELDS, ...PRO_FIELDS, ...ENTERPRISE_FIELDS].join(",");
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/**
- * Envia uma única requisição à Text Search (New). Cada chamada é uma requisição cobrada pelo Google,
- * então ela só deve ser feita depois de `reserveRequest`.
- * @param {{ textQuery: string, pageToken?: string, apiKey: string }} params Na paginação, `textQuery` precisa
- * ser igual ao da primeira página. `apiKey` é a chave informada na busca; ela só é repassada ao Google.
- * @returns {Promise<{ ok: boolean, status: number, body: any }>} `body` é `null` quando a resposta não é JSON.
- * @throws Erro de rede ou de timeout, sem resposta do Google.
- */
+/** Envia uma requisição à Text Search. Devolve `{ ok, status, body }`; lança erro só sem resposta do Google. */
 async function searchText({ textQuery, pageToken, apiKey }) {
 	const response = await fetch(settings.PLACES_API_URL, {
 		method: "POST",

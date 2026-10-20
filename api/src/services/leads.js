@@ -1,11 +1,8 @@
 import { prisma } from "./prisma.js";
+import { httpError, placeToLead } from "#src/utils";
 
-// O objeto completo do Google pesa alguns KB por lead e não é usado na listagem.
-const OMIT_GOOGLE_DATA = { googleData: true };
-const WITH_LEAD = { lead: { omit: OMIT_GOOGLE_DATA } };
+const WITH_LEAD = { lead: { omit: { googleData: true } } };
 
-// O `leadId` no fim desempata: sem ele, empresas com a mesma nota ou a mesma data podem trocar de lugar
-// entre uma consulta e outra e aparecer em duas páginas, ou em nenhuma.
 const ORDER_BY = {
 	reviews: [
 		{ lead: { userRatingCount: { sort: "desc", nulls: "last" } } },
@@ -21,10 +18,7 @@ const ORDER_BY = {
 	recent: [{ firstSeenAt: "desc" }, { leadId: "asc" }],
 };
 
-/**
- * Lead como o front recebe: os dados do Google com o acompanhamento e a busca de origem do usuário.
- * `firstSeenAt` é quando a empresa entrou na lista dele.
- */
+/** Junta os dados do `Lead` com o acompanhamento do usuário (`UserLead`). */
 function toUserLead({ lead, userId, leadId, firstSearchId, ...tracking }) {
 	return { ...lead, ...tracking };
 }
@@ -50,10 +44,7 @@ function buildWhere(userId, filters) {
 	return where;
 }
 
-/**
- * Página de leads do usuário que atendem aos filtros.
- * @returns {Promise<{ items: object[], total: number, page: number, pageSize: number }>}
- */
+/** Página de leads do usuário com filtros: `{ items, total, page, pageSize }`. */
 async function listLeads(userId, filters, { page, pageSize, orderBy }) {
 	const where = buildWhere(userId, filters);
 	const [rows, total] = await prisma.$transaction([
@@ -69,10 +60,7 @@ async function listLeads(userId, filters, { page, pageSize, orderBy }) {
 	return { items: rows.map(toUserLead), total, page, pageSize };
 }
 
-/**
- * Valores distintos de cidade, categoria e bairro nos leads do usuário, em ordem alfabética.
- * O bairro junta o bairro do Google e o bairro das buscas.
- */
+/** Cidades, categorias e bairros distintos nos leads do usuário, em ordem alfabética. */
 async function getLeadFilterOptions(userId) {
 	const rows = await prisma.userLead.findMany({
 		where: { userId },
@@ -86,13 +74,7 @@ async function getLeadFilterOptions(userId) {
 	};
 }
 
-/**
- * Atualiza só os campos de acompanhamento do lead na lista do usuário.
- * @param {number} userId
- * @param {string} id `places.id`.
- * @param {{ status?: string, notes?: string | null }} data
- * @throws 404 (P2025) se a empresa não está na lista do usuário.
- */
+/** Atualiza status e anotações do lead na lista do usuário. Lança 404 se ele não está na lista. */
 async function updateLead(userId, id, data) {
 	const row = await prisma.userLead.update({
 		where: { userId_leadId: { userId, leadId: id } },
@@ -102,4 +84,59 @@ async function updateLead(userId, id, data) {
 	return toUserLead(row);
 }
 
-export { listLeads, getLeadFilterOptions, updateLead };
+/** Empresas que uma busca do usuário trouxe, com `page` e `isNew`. Lança 404 se a busca não é dele. */
+async function listSearchLeads(userId, searchId) {
+	const search = await prisma.search.findFirst({ where: { id: searchId, userId } });
+	if (!search) throw httpError(404, "Busca não encontrada.");
+
+	const found = await prisma.searchLead.findMany({ where: { searchId }, select: { leadId: true, page: true } });
+	const pageOf = new Map(found.map((row) => [row.leadId, row.page]));
+	const rows = await prisma.userLead.findMany({
+		where: { userId, leadId: { in: [...pageOf.keys()] } },
+		include: WITH_LEAD,
+		orderBy: ORDER_BY.reviews,
+	});
+
+	const items = rows
+		.map((row) => ({ ...toUserLead(row), page: pageOf.get(row.leadId), isNew: row.firstSearchId === searchId }))
+		.sort((a, b) => a.page - b.page);
+	return { search, items };
+}
+
+/** Grava os lugares de uma página da busca e devolve quantos entraram na lista do usuário. */
+async function saveSearchLeads(places, search, page) {
+	const withId = places.filter((place) => place.id);
+	const ids = [...new Set(withId.map((place) => place.id))];
+	if (!ids.length) return 0;
+
+	const now = new Date();
+	const results = await prisma.$transaction([
+		...withId.map((place) => {
+			const data = placeToLead(place);
+			return prisma.lead.upsert({
+				where: { id: place.id },
+				create: { id: place.id, ...data, firstSeenAt: now, lastSeenAt: now },
+				update: { ...data, lastSeenAt: now },
+			});
+		}),
+		prisma.searchLead.createMany({
+			data: ids.map((leadId) => ({ searchId: search.id, leadId, page, createdAt: now })),
+			skipDuplicates: true,
+		}),
+		prisma.userLead.createMany({
+			data: ids.map((leadId) => ({
+				userId: search.userId,
+				leadId,
+				city: search.city,
+				category: search.category,
+				searchNeighborhood: search.neighborhood,
+				firstSearchId: search.id,
+				firstSeenAt: now,
+			})),
+			skipDuplicates: true,
+		}),
+	]);
+	return results.at(-1).count;
+}
+
+export { listLeads, getLeadFilterOptions, updateLead, listSearchLeads, saveSearchLeads };

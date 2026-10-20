@@ -4,20 +4,16 @@ const SITE_STATUSES = ["NO_WEBSITE", "INSTAGRAM_ONLY", "WHATSAPP_ONLY", "FACEBOO
 const LEAD_STATUSES = ["NEW", "IN_PROGRESS", "CONTACTED", "REPLIED", "CLOSED", "DISCARDED"];
 const BUSINESS_STATUSES = ["OPERATIONAL", "CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY", "FUTURE_OPENING"];
 
-/** Lista separada por vírgula ("NO_WEBSITE,INSTAGRAM_ONLY") com valores de `values`. */
+/** Lista separada por vírgula com valores de `values`. */
 const commaList = (values) =>
 	z
 		.string()
 		.transform((text) => text.split(",").map((item) => item.trim()).filter(Boolean))
 		.pipe(z.array(z.enum(values)));
 
-// Na query string, um parâmetro vazio ("?city=") equivale a não informá-lo.
 const withoutEmptyValues = (query) => Object.fromEntries(Object.entries(query ?? {}).filter(([, value]) => value !== ""));
 
-/**
- * Query string de `GET /leads`: filtros, paginação e ordenação.
- * Os filtros de texto ignoram maiúsculas e minúsculas na consulta.
- */
+/** Query string de `GET /leads`: filtros, paginação e ordenação. */
 const leadQuerySchema = z.preprocess(
 	withoutEmptyValues,
 	z.object({
@@ -36,9 +32,7 @@ const leadQuerySchema = z.preprocess(
 	}),
 );
 
-/**
- * Corpo de `PATCH /leads/:id`. Só os campos de acompanhamento podem mudar; `notes` vazio vira `null`.
- */
+/** Corpo de `PATCH /leads/:id`: `status` e `notes`; `notes` vazio vira `null`. */
 const leadUpdateSchema = z
 	.object({
 		status: z.enum(LEAD_STATUSES).optional(),

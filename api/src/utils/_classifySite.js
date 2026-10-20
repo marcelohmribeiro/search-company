@@ -17,13 +17,7 @@ function parseHostname(uri) {
 	}
 }
 
-/**
- * Classifica o `websiteUri` de um lugar do Google.
- * Subdomínios contam como o domínio principal (`m.facebook.com` é Facebook).
- * @param {string | null | undefined} websiteUri
- * @returns {"NO_WEBSITE" | "INSTAGRAM_ONLY" | "WHATSAPP_ONLY" | "FACEBOOK_ONLY" | "LINK_AGGREGATOR" | "HAS_WEBSITE"}
- * `HAS_WEBSITE` também é usado quando a URL não pode ser lida.
- */
+/** Situação do site a partir do `websiteUri`. Subdomínios contam como o domínio principal. */
 function classifySite(websiteUri) {
 	if (!websiteUri?.trim()) return "NO_WEBSITE";
 

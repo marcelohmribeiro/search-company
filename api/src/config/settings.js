@@ -1,6 +1,5 @@
 import "dotenv/config"
 
-// Teto da cota grátis de Text Search Enterprise (1.000/mês) com margem. O .env só pode baixar esse valor.
 const HARD_REQUEST_LIMIT = 990
 
 function readNumber(value, fallback) {

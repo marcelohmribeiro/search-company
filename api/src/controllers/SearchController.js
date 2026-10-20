@@ -1,5 +1,5 @@
-import { runSearch, listSearches } from "#src/services";
-import { searchInputSchema, googleApiKeySchema } from "#src/schemas";
+import { runSearch, listSearches, listSearchLeads } from "#src/services";
+import { searchInputSchema, googleApiKeySchema, searchIdSchema } from "#src/schemas";
 
 const SearchController = () => {
   async function create(req, res, next) {
@@ -24,9 +24,20 @@ const SearchController = () => {
     }
   }
 
+  async function leads(req, res, next) {
+    try {
+      const data = await listSearchLeads(req.user.id, searchIdSchema.parse(req.params.id));
+
+      return res.status(200).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   return {
     create,
     findAll,
+    leads,
   };
 };
 

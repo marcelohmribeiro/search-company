@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// Sem espaços nas pontas e em minúsculas, para o login não depender de como o usuário foi digitado.
 const username = z.string({ error: "Informe o usuário." }).trim().toLowerCase();
 
 /** Corpo de `POST /auth/login`. */
