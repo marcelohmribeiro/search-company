@@ -22,6 +22,7 @@ Como a trava funciona (`api/src/services/usage.js` e `search.js`):
 - **O contador fica no banco.** Cada chamada HTTP à Places API vira uma linha em `ApiRequest`, com o usuário e o hash da chave usada.
   - O uso do mês de um usuário conta as linhas dele **e** as feitas com a chave que ele está usando (a do header), por qualquer conta. Assim, trocar de chave ou usar a mesma chave em outra conta não zera o uso.
   - As requisições de antes das contas (sem `keyHash`) contam pelo `userId`.
+- **A chave entra crua e o hash é calculado só em `usage.js`** (`getUsage`, `assertQuota` e `reserveRequest` recebem `apiKey`).
 - **A linha é criada antes da chamada.** `reserveRequest` cria a linha antes de a requisição sair. Depois, `finishRequest` grava o resultado. A linha conta mesmo que a chamada falhe ou o processo caia no meio.
 - **Cada página é uma requisição.** Uma busca de 3 páginas gasta 3, e o limite é conferido antes de **cada** página.
 - **Conferência e registro são atômicos.** A contagem e a criação rodam numa transação com `pg_advisory_xact_lock`. Além disso, cada usuário roda **uma busca por vez**: uma segunda busca simultânea dele recebe 409.
@@ -85,7 +86,7 @@ O preço depende dos campos pedidos. **A requisição é cobrada pela faixa (SKU
 - O `place_id` pode ser guardado sem restrição. O Google recomenda atualizar IDs com mais de 12 meses, o que é **gratuito**: basta um Place Details pedindo só o campo `id`.
 - Latitude e longitude só podem ficar em cache por até 30 dias.
 - **O restante do conteúdo** (nome, telefone, endereço, site, nota) **não pode ser armazenado** além das exceções dos termos. Ver "Decisões em aberto".
-- Ao exibir resultados fora de um mapa do Google, é obrigatório atribuir a fonte ao Google.
+- Ao exibir resultados fora de um mapa do Google, é obrigatório atribuir a fonte ao Google. O rodapé "Dados das empresas: Google Maps" foi removido a pedido do usuário em 20/10/2026; ver "Decisões em aberto".
 
 ### Links
 
@@ -157,8 +158,15 @@ O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois d
 - **`api/`**
   - Os imports internos usam o alias `#src/...` (definido em `package.json` → `imports`). Cada pasta tem um `index.js` que reexporta seus arquivos **por caminho relativo** (`./arquivo.js`). Importe sempre a pasta (`#src/services`), nunca `#src/<pasta>/<arquivo>.js`: na Vercel, o empacotamento não inclui arquivos importados nesse formato, e a função quebra com `ERR_MODULE_NOT_FOUND`.
   - Controllers são fábricas (`XController()`) com `try/catch` e `next(error)`, no padrão de `plop/component/`. Ao gerar pelo plop, responda **sim** para `verifyJWT`: toda rota nova precisa de login.
+  - **Cada camada com o seu papel:**
+    - rotas ligam caminho, middleware e controller;
+    - controllers só validam a entrada com zod, chamam o service e respondem;
+    - middlewares só leem o header e decidem (a verificação do JWT fica em `readSessionToken`, no service de auth, e o papel de admin em `isAdmin`, no de usuários);
+    - services têm as regras e o acesso ao banco: `search.js` só orquestra a busca, `places.js` só fala com o Google, `usage.js` só cuida da trava, `leads.js` lê e grava leads (inclusive os de uma página da busca, em `saveSearchLeads`);
+    - utils são funções puras, como `placeToLead` (converte um `Place` nas colunas do `Lead`) e `classifySite`.
+  - Sem comentários inline. JSDoc só com uma linha objetiva do que a função faz, quando o nome não basta.
   - A entrada é validada com zod, em `src/schemas/`. Os controllers chamam `schema.parse(...)`. Quando a validação falha, o `handleError` devolve 400 com o primeiro problema, no formato `"campo": mensagem`. As mensagens saem em português pelo `z.locales.pt()`, configurado em `src/schemas/index.js`.
-  - Para responder com erro, lance `httpError(status, mensagem)`. O `handleError` (`src/utils/_handleError.js`) devolve `{ error }`.
+  - Para responder com erro, lance `httpError(status, mensagem)`. O `handleError` (`src/utils/_handleError.js`) devolve `{ error }`; erros conhecidos do Prisma viram 409, 400 ou 404 pela tabela `PRISMA_ERRORS`.
   - O servidor escuta **só em `127.0.0.1`**, e o Postgres expõe a porta só nesse endereço. Assim nenhum outro dispositivo da rede acessa os dois. O acesso à API exige login (ver "Autenticação").
   - As URLs usam `localhost` (`http://localhost:3333`, `localhost:5432`), que aponta para esse mesmo endereço.
   - O front precisa ser aberto exatamente em `http://localhost:5173`, a origem liberada no CORS pelo `FRONTEND_URL`. Para o navegador, `127.0.0.1:5173` é outra origem, e a API recusaria as chamadas.
@@ -166,12 +174,20 @@ O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois d
   - O alias `src/` aponta para `app/src`.
   - As chamadas à API ficam em `src/services/`, os tipos em `src/types/` e os rótulos em português em `src/constants/labels.ts`.
   - O uso do mês é um store do Zustand (`src/store/usageStore.ts`).
+  - **Hooks** ficam em `src/hooks/` e são importados de `src/hooks`:
+    - `useApi(fetcher)`: carrega dados da API com `data`, `error`, `loading`, `reload` e `setData`, ignorando respostas antigas. O `fetcher` precisa ser estável (função de `src/services` ou `useCallback`). Use em toda tela que carrega dados, em vez de `useEffect` com `useState`.
+    - `useLeadQuery()`: filtros, página e tamanho de página da tela de leads na URL.
+    - `useSearchRunner(onFinish)`: roda a fila de combinações da busca, uma de cada vez, e guarda o andamento.
+    - `useAuthSubmit()`: envia o login ou o cadastro e abre a sessão.
+  - Sem comentários inline no código do app. Documentação só em JSDoc, quando diz algo que o nome e o tipo não dizem.
   - A interface usa **shadcn/ui** (`components.json`: base Radix, preset `nova`, cor neutra, fonte Geist, ícones lucide):
     - Para adicionar um componente, rode `bunx shadcn@latest add <nome>` em `app/`. Ele cai em `src/components/ui/`.
     - Não edite à mão os arquivos de `src/components/ui/`. Ajuste a aparência por `className` em quem usa o componente.
     - O `cn` vem do pacote `cn` (do próprio shadcn), reexportado em `src/lib/utils.ts`.
-    - As cores do tema ficam nas variáveis CSS de `src/css/index.css`.
-  - Os componentes próprios ficam em `src/components/search/` (formulário, chave do Google, andamento e histórico), `src/components/leads/` (filtros, tabela, painel de detalhes, badge do site e select de status) e `src/components/admin/` (usuários, empresas e entradas). `PageHeader`, `UsageMeter`, `RequireAuth` e `RequireAdmin` ficam na raiz de `src/components/`.
+    - As cores do tema ficam nas variáveis CSS de `src/css/index.css`, com as do tema escuro em `.dark`.
+  - **Tema claro e escuro** com `next-themes` (`ThemeProvider` em `src/main.jsx`, chave `search-company:theme` no `localStorage`). Sem escolha salva, segue o sistema. O botão do sol/lua no cabeçalho (`src/components/ThemeToggle.tsx`) alterna entre claro e escuro. Um script no `index.html` aplica o `.dark` antes do React carregar, para a página não piscar.
+    - Cores fixas do Tailwind precisam da variante escura: `bg-*-50` com `dark:bg-*-950/60`, `border-*-200` com `dark:border-*-900`, `text-*-700` com `dark:text-*-300` e `text-*-600` com `dark:text-*-400`. Pontos e barras (`bg-*-500`) servem nos dois temas.
+  - Os componentes próprios ficam em `src/components/search/` (formulário, chave do Google, andamento e histórico), `src/components/leads/` (filtros, tabela, painel de detalhes, badge do site e select de status) e `src/components/admin/` (usuários, empresas e entradas). `LeadRating` (nota com estrelas) e `LeadStatusLabel` (status com a bolinha) ficam em `src/components/leads/` e servem às tabelas de leads, do admin e da busca. `PageHeader`, `UsageMeter`, `ThemeToggle`, `AuthCard` (layout do login e do cadastro), `RequireAuth` e `RequireAdmin` ficam na raiz de `src/components/`.
   - Os avisos usam o `toast` do `sonner`; o `Toaster` e o `TooltipProvider` ficam em `src/pages/layout.tsx`.
   - Formatação em pt-BR (data, número e nota) fica em `src/lib/format.ts`.
 - Os valores de enum ficam em inglês no código (`NO_WEBSITE`, `CONTACTED`) e são exibidos em português na interface.
@@ -235,7 +251,7 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
   - Revogar apaga o token, e ele para de funcionar na hora. O último uso é gravado no máximo uma vez por minuto.
   - A skill `proposta-site` (`~/.claude/skills/proposta-site`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do bloco `env` do `~/.claude/settings.json`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e tira das anotações o link do site de demonstração.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
-- **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
+- **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada (`isAdmin`) e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
 - Na migration `users_own_leads`, os dados que já existiam foram para o primeiro usuário (o de menor id), que virou admin. No Supabase, o único usuário antes dela era o admin, hoje `admin` (antes `admin@gmail.com`). Os outros usuários foram apagados em 19/10/2026 e 20/10/2026.
 - A senha é guardada com `scrypt` do Node (`src/utils/_password.js`), com salt aleatório e comparação em tempo constante.
@@ -263,6 +279,7 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Respostas: 201 com `{ skipped, search, usage }`, 409 com outra busca do usuário em andamento e 429 com a cota dele esgotada.
   - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
 - `GET /searches`: histórico do usuário, com as mais recentes primeiro.
+- `GET /searches/:id/leads`: `{ search, items }` com as empresas que uma busca do usuário trouxe, no formato de `GET /leads` mais `page` (página da busca) e `isNew` (foi essa busca que a colocou na lista). Ordem: página e, dentro dela, mais avaliações. 404 se a busca é de outro usuário.
 - As três rotas de `/leads` abaixo aceitam também um token pessoal no `Authorization: Bearer`.
 - `GET /leads`: listagem paginada dos leads do usuário.
   - Filtros: `siteStatus`, `status` e `businessStatus` (aceitam vários valores separados por vírgula), `minRating`, `minReviews`, `city`, `category`, `neighborhood` e `q` (nome).
@@ -283,10 +300,11 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Campos de cidade, categorias e bairros (um por linha), páginas por busca e "pular buscas já feitas".
   - Mostra a estimativa de custo (combinações × páginas) e pede confirmação num diálogo antes de rodar.
   - Roda as combinações em sequência, mostrando o andamento, e permite parar depois da atual. Também mostra o histórico.
+  - Clicar numa busca do histórico abre um modal (`SearchLeadsDialog`) com as empresas que ela trouxe: nota, situação do site, status e página, com o selo "Nova" nas que entraram na lista por ela. Clicar numa empresa abre o painel de detalhes dela.
 - **Leads (`/leads`):**
   - Filtros em chips (situação do site, status e funcionamento) e campos para nome, cidade, categoria, bairro, nota mínima, mínimo de avaliações e ordenação.
   - Por padrão, "Tem site" vem desmarcado e os outros chips mostram tudo. Isso só esconde da tela: os dados continuam no banco.
-  - **O estado da tela fica na URL** (`/leads?q=…&siteStatus=…&page=3&pageSize=25`), por `src/lib/leadQuery.ts`:
+  - **O estado da tela fica na URL** (`/leads?q=…&siteStatus=…&page=3&pageSize=25`), por `src/lib/leadQuery.ts` e pelo hook `useLeadQuery`:
     - A URL só guarda o que difere do padrão. `siteStatus=` vazio significa "nenhuma situação marcada" (mostra todas), e a ausência do parâmetro significa o padrão.
     - Recarregar, abrir em outra aba e usar voltar/avançar mantêm filtros e página.
     - Mudar de página cria uma entrada no histórico. Mudar filtros só substitui a URL atual.
@@ -295,10 +313,8 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
     - O link "Leads" do menu volta aos últimos filtros usados (`src/store/leadsViewStore.ts`, só em memória).
   - Paginação na API (`page`, `pageSize` até 100). A tela oferece 25, 50 ou 100 linhas por página e números de página com reticências; no celular mostra "2 de 6".
   - Empresas que não estão funcionando aparecem com um aviso em vermelho embaixo do nome.
-  - Cada linha tem um ícone que copia o pedido de landing page (`src/lib/landingPrompt.ts`): `/landing-page create an landing page for this {instagram} handle and maps {google_fotos_link} ask me anything you are unsure`.
-    - `{instagram}` vira o perfil da empresa quando o site no Google é o Instagram ("Só Instagram"); `{google_fotos_link}` vira o link das fotos no Maps, ou o da página no Maps.
-    - O que faltar continua como marcador no texto, e um aviso pede para completar.
-  - Na tabela, o status pode ser trocado direto. O painel lateral de detalhes tem anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações.
+  - Clicar em qualquer parte da linha abre os detalhes da empresa no painel lateral (`LeadDetailSheet`), com anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações. O status pode ser trocado direto na tabela: o select, os links e os botões da linha não abrem o painel.
+  - A tabela e os filtros são memorizados (`memo`) e recebem funções estáveis (`useCallback`), para abrir e fechar o painel não redesenhar todas as linhas.
 - **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como o bloco `env` para o `~/.claude/settings.json` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
   - lista dos usuários com empresas, buscas, requisições no mês, entradas e último acesso;
@@ -337,6 +353,8 @@ Projeto `prospeccao-sites`, com faturamento vinculado.
 O Google **não bloqueia** sozinho quando a cota grátis acaba, então a proteção principal é a trava no backend. No cadastro do cartão, o Google faz uma pré-autorização de R$ 125, que não é cobrada e some em alguns dias.
 
 ## Decisões em aberto
+
+- **Atribuição ao Google.** Os termos pedem a atribuição quando os dados aparecem fora de um mapa do Google, e o app não mostra mais nenhuma. Se o app passar a ser usado por outras pessoas, vale voltar com ela num lugar discreto.
 
 - **Armazenamento dos dados dos leads.** Pelos termos, só o `place_id` pode ser guardado, e coordenadas só podem ficar até 30 dias. O app grava hoje o nome, o telefone, o site e a nota no banco. Também grava `location`, `viewport` e `plusCode` dentro de `googleData`. Há duas saídas:
   - aceitar esse risco, já que o uso é pessoal;
