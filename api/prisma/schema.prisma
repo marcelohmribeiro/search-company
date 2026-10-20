@@ -19,6 +19,7 @@ enum SiteStatus {
 enum LeadStatus {
   NEW
   IN_PROGRESS
+  DONE
   CONTACTED
   REPLIED
   CLOSED

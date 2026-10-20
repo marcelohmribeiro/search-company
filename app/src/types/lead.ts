@@ -6,7 +6,7 @@ export type SiteStatus =
 	| 'LINK_AGGREGATOR'
 	| 'HAS_WEBSITE'
 
-export type LeadStatus = 'NEW' | 'IN_PROGRESS' | 'CONTACTED' | 'REPLIED' | 'CLOSED' | 'DISCARDED'
+export type LeadStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'CONTACTED' | 'REPLIED' | 'CLOSED' | 'DISCARDED'
 
 export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'FUTURE_OPENING'
 
