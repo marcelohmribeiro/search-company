@@ -203,7 +203,7 @@ Tudo o que a API devolve é guardado. A filtragem (tem site, fechada, nota etc.)
   - A API devolve o lead "achatado": os campos do `Lead` com os do `UserLead` por cima (`toUserLead` em `src/services/leads.js`).
 - **`SearchLead`**: quais empresas cada busca trouxe, com a página e a data.
 - **`User`**: quem pode entrar no app.
-  - E-mail (sempre em minúsculas) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
+  - `username` (sempre em minúsculas, de 3 a 30 letras sem acento, números, `.`, `-` ou `_`) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
   - `role`: `ADMIN` ou `USER`.
 - **`UserAccess`**: as entradas de cada usuário no app (`startedAt` e `lastSeenAt`). Cada `GET /me`, que o front chama ao abrir o app, registra uma entrada; aberturas com menos de 30 minutos de intervalo estendem a mesma.
 
@@ -222,15 +222,15 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
 
 ### Autenticação
 
-- **Login por e-mail e senha.** `POST /auth/login` confere a senha e devolve `{ token, user }`. O token é um JWT com `{ id }`, válido por 7 dias.
-- **Cadastro aberto no app** (`/register`). `POST /auth/register` com `{ email, password }` cria um usuário comum (`USER`) e já devolve `{ token, user }`, como o login.
-  - A senha precisa ter de 8 a 200 caracteres. E-mail que já tem conta responde 409.
+- **Login por usuário e senha.** `POST /auth/login` confere a senha e devolve `{ token, user }`. O token é um JWT com `{ id }`, válido por 7 dias.
+- **Cadastro aberto no app** (`/register`). `POST /auth/register` com `{ username, password }` cria um usuário comum (`USER`) e já devolve `{ token, user }`, como o login.
+  - O usuário é gravado em minúsculas e o login não diferencia maiúsculas. A senha precisa ter de 8 a 200 caracteres. Usuário que já existe responde 409.
   - Não há script de terminal para criar usuários. Para tornar alguém admin, altere o `role` dele direto no banco.
 - **Rotas protegidas:** todas, menos `POST /auth/login`, `POST /auth/register` e `GET /`, passam pelo `verifyJWT` (`src/middlewares/auth.js`). Sem token, ou com token inválido ou expirado, a resposta é 401 `{ message }`.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
 - **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
-- Na migration `users_own_leads`, os dados que já existiam foram para o primeiro usuário (o de menor id), que virou admin. No Supabase, o único usuário antes dela é `admin@gmail.com` (os anteriores foram apagados em 19/10/2026).
+- Na migration `users_own_leads`, os dados que já existiam foram para o primeiro usuário (o de menor id), que virou admin. No Supabase, o único usuário antes dela era o admin, hoje `admin` (antes `admin@gmail.com`). Os outros usuários foram apagados em 19/10/2026 e 20/10/2026.
 - A senha é guardada com `scrypt` do Node (`src/utils/_password.js`), com salt aleatório e comparação em tempo constante.
 - **No app:**
   - o token fica no `localStorage` (`search-company:auth`, em `src/store/authStore.ts`) e o interceptor do axios o envia como `Authorization: Bearer`;
@@ -246,9 +246,9 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
 
 Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o header `Authorization: Bearer <token>`.
 
-- `POST /auth/login` com `{ email, password }`: devolve `{ token, user }`, ou 401 com e-mail ou senha errados.
-- `POST /auth/register` com `{ email, password }`: cria a conta (`USER`) e devolve `{ token, user }`. 409 se o e-mail já tem conta.
-- `GET /me`: o usuário logado, `{ id, email, role }`. Registra uma entrada no app.
+- `POST /auth/login` com `{ username, password }`: devolve `{ token, user }`, ou 401 com usuário ou senha errados.
+- `POST /auth/register` com `{ username, password }`: cria a conta (`USER`) e devolve `{ token, user }`. 409 se o usuário já existe.
+- `GET /me`: o usuário logado, `{ id, username, role }`. Registra uma entrada no app.
 - `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`. Com o header `X-Google-Api-Key`, inclui o que outras contas fizeram com a mesma chave, como a trava conta.
 - `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }` e o header `X-Google-Api-Key`: roda **uma** combinação com essa chave.
   - Sem o header, responde 400.

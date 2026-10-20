@@ -9,7 +9,7 @@ const ACCESS_GAP_MS = 30 * 60_000;
  * @throws 401 se o usuário do token não existe mais.
  */
 async function getMe(userId) {
-	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
+	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, role: true } });
 	if (!user) throw httpError(401, "Usuário não encontrado.");
 	return user;
 }

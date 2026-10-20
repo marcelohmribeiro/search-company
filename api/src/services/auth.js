@@ -13,34 +13,34 @@ async function createSession(userId) {
 }
 
 /**
- * Confere e-mail e senha e abre uma sessão.
- * @param {{ email: string, password: string }} credentials E-mail já em minúsculas.
+ * Confere usuário e senha e abre uma sessão.
+ * @param {{ username: string, password: string }} credentials Usuário já em minúsculas.
  * @returns {Promise<{ token: string, user: object }>}
- * @throws Erro 401 com e-mail ou senha errados, sem dizer qual dos dois.
+ * @throws Erro 401 com usuário ou senha errados, sem dizer qual dos dois.
  */
-async function authenticate({ email, password }) {
-	const user = await prisma.user.findUnique({ where: { email } });
+async function authenticate({ username, password }) {
+	const user = await prisma.user.findUnique({ where: { username } });
 	if (!user || !(await verifyPassword(password, user.passwordHash))) {
-		throw httpError(401, "E-mail ou senha inválidos.");
+		throw httpError(401, "Usuário ou senha inválidos.");
 	}
 	return createSession(user.id);
 }
 
 /**
  * Cria a conta de um usuário comum (`USER`) e já abre a sessão dele.
- * @param {{ email: string, password: string }} data E-mail já em minúsculas.
+ * @param {{ username: string, password: string }} data Usuário já em minúsculas.
  * @returns {Promise<{ token: string, user: object }>}
- * @throws Erro 409 se o e-mail já tem conta.
+ * @throws Erro 409 se o usuário já existe.
  */
-async function register({ email, password }) {
+async function register({ username, password }) {
 	const passwordHash = await hashPassword(password);
 	try {
-		const user = await prisma.user.create({ data: { email, passwordHash }, select: { id: true } });
+		const user = await prisma.user.create({ data: { username, passwordHash }, select: { id: true } });
 		return createSession(user.id);
 	} catch (error) {
-		// P2002: violação do e-mail único, inclusive quando duas contas iguais são criadas ao mesmo tempo.
+		// P2002: violação do usuário único, inclusive quando duas contas iguais são criadas ao mesmo tempo.
 		if (error?.code === "P2002") {
-			throw httpError(409, "Já existe uma conta com esse e-mail.");
+			throw httpError(409, "Esse usuário já existe.");
 		}
 		throw error;
 	}

@@ -4,7 +4,7 @@ import { httpError } from "#src/utils";
 
 const SUMMARY_SELECT = {
 	id: true,
-	email: true,
+	username: true,
 	role: true,
 	createdAt: true,
 	_count: { select: { leads: true, searches: true, accesses: true } },

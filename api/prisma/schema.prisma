@@ -179,8 +179,8 @@ model SearchLead {
 /// Quem pode usar o app. Só é criado pelo terminal (`bun run user:create`); não há cadastro pela API.
 model User {
   id           Int          @id @default(autoincrement())
-  /// Sempre em minúsculas.
-  email        String       @unique
+  /// Nome de usuário do login, sempre em minúsculas: 3 a 30 letras, números, ".", "-" ou "_".
+  username     String       @unique
   /// "salt:hash" do scrypt, em hexadecimal. A senha nunca é guardada.
   passwordHash String
   /// `ADMIN` também vê o painel com os usuários, as empresas e as entradas de cada um.
