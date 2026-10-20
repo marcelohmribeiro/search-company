@@ -22,7 +22,7 @@ import { Switch } from 'src/components/ui/switch'
 import { Textarea } from 'src/components/ui/textarea'
 import { formatNumber, plural } from 'src/lib/format'
 import { parseList, textQuery } from 'src/lib/search'
-import { useAuthStore } from 'src/store/authStore'
+import { useApiKeyStore } from 'src/store/apiKeyStore'
 import { useUsageStore } from 'src/store/usageStore'
 import type { SearchCombo, SearchRequest } from 'src/types'
 
@@ -56,7 +56,7 @@ function ParsedItems({ items }: { items: string[] }) {
 
 export default function SearchForm({ running, stopping, onRun, onStop }: SearchFormProps) {
 	const usage = useUsageStore((state) => state.usage)
-	const hasApiKey = useAuthStore((state) => state.user?.hasGoogleApiKey === true)
+	const apiKey = useApiKeyStore((state) => state.apiKey.trim())
 	const [city, setCity] = useState('')
 	const [categoriesText, setCategoriesText] = useState('')
 	const [neighborhoodsText, setNeighborhoodsText] = useState('')
@@ -77,11 +77,12 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 	const cityName = city.trim().replace(/\s+/g, ' ')
 	const estimate = combos.length * maxPages
 	const remaining = usage?.remaining ?? 0
+	const hasApiKey = apiKey !== ''
 	const canRun = !running && hasApiKey && cityName !== '' && combos.length > 0 && remaining > 0
 
 	function confirm() {
 		setConfirmOpen(false)
-		onRun({ city: cityName, combos, maxPages, skipIfDone })
+		onRun({ apiKey, city: cityName, combos, maxPages, skipIfDone })
 	}
 
 	return (
@@ -183,7 +184,7 @@ export default function SearchForm({ running, stopping, onRun, onStop }: SearchF
 					{!hasApiKey && (
 						<p className='flex items-center gap-1.5 pt-1 text-xs text-amber-700'>
 							<KeyRound className='size-3.5' />
-							Salve a chave da API do Google para buscar.
+							Informe a chave da API do Google para buscar.
 						</p>
 					)}
 					{usage && remaining === 0 && (

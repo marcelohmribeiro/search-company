@@ -6,14 +6,18 @@ import { Skeleton } from 'src/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from 'src/components/ui/tooltip'
 import { formatNumber } from 'src/lib/format'
 import { cn } from 'src/lib/utils'
+import { useApiKeyStore } from 'src/store/apiKeyStore'
 import { useUsageStore } from 'src/store/usageStore'
 
 export default function UsageMeter() {
 	const { usage, error, refresh } = useUsageStore()
+	const apiKey = useApiKeyStore((state) => state.apiKey.trim())
 
+	// O uso também conta o que outras contas fizeram com a chave informada. Espera parar de digitar para atualizar.
 	useEffect(() => {
-		refresh()
-	}, [refresh])
+		const timer = setTimeout(refresh, 400)
+		return () => clearTimeout(timer)
+	}, [refresh, apiKey])
 
 	if (error) {
 		return (

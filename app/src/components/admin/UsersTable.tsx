@@ -15,8 +15,7 @@ export default function UsersTable({ users }: { users: AdminUser[] }) {
 					<TableHead className='text-right'>Buscas</TableHead>
 					<TableHead className='text-right'>Requisições no mês</TableHead>
 					<TableHead className='text-right'>Entradas</TableHead>
-					<TableHead>Último acesso</TableHead>
-					<TableHead className='pr-4'>Chave do Google</TableHead>
+					<TableHead className='pr-4'>Último acesso</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -37,19 +36,8 @@ export default function UsersTable({ users }: { users: AdminUser[] }) {
 							<span className='text-muted-foreground'> / {formatNumber(user.usage.limit)}</span>
 						</TableCell>
 						<TableCell className='text-right tabular-nums'>{formatNumber(user.accessesCount)}</TableCell>
-						<TableCell className='text-muted-foreground tabular-nums'>
+						<TableCell className='pr-4 text-muted-foreground tabular-nums'>
 							{user.lastAccessAt ? formatDateTime(user.lastAccessAt) : '—'}
-						</TableCell>
-						<TableCell className='pr-4'>
-							{user.hasGoogleApiKey ? (
-								<Badge variant='outline' className='border-emerald-200 bg-emerald-50 text-emerald-700'>
-									Salva
-								</Badge>
-							) : (
-								<Badge variant='outline' className='text-muted-foreground'>
-									Sem chave
-								</Badge>
-							)}
 						</TableCell>
 					</TableRow>
 				))}

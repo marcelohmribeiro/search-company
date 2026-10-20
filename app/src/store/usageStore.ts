@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { fetchUsage, getErrorMessage } from 'src/services'
+import { useApiKeyStore } from 'src/store/apiKeyStore'
 import type { Usage } from 'src/types'
 
 interface UsageState {
@@ -15,7 +16,8 @@ const useUsageStore = create<UsageState>((set) => ({
 
 	refresh: async () => {
 		try {
-			set({ usage: await fetchUsage(), error: null })
+			const apiKey = useApiKeyStore.getState().apiKey.trim()
+			set({ usage: await fetchUsage(apiKey || undefined), error: null })
 		} catch (error) {
 			set({ error: getErrorMessage(error) })
 		}

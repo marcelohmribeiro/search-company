@@ -89,7 +89,7 @@ function AdminUserView({ userId }: { userId: number }) {
 				<Stat
 					label='Requisições no mês'
 					value={user && `${formatNumber(user.usage.used)} / ${formatNumber(user.usage.limit)}`}
-					hint={user ? (user.hasGoogleApiKey ? `Restam ${formatNumber(user.usage.remaining)}` : 'Sem chave do Google salva') : undefined}
+					hint={user ? `Restam ${formatNumber(user.usage.remaining)}` : undefined}
 				/>
 				<Stat
 					label='Entradas no app'

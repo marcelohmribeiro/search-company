@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 import { CircleAlert, MapPinned } from 'lucide-react'
 import { Alert, AlertDescription } from 'src/components/ui/alert'
 import { Button } from 'src/components/ui/button'
@@ -8,12 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from 'src/c
 import { Field, FieldGroup, FieldLabel } from 'src/components/ui/field'
 import { Input } from 'src/components/ui/input'
 import { Spinner } from 'src/components/ui/spinner'
+import { safeNext, withNext } from 'src/lib/safeNext'
 import { isTokenActive } from 'src/lib/token'
 import { getErrorMessage, login } from 'src/services'
 import { useAuthStore } from 'src/store/authStore'
-
-// Só aceita caminhos do próprio app, para o `next` da URL não mandar para outro site.
-const safeNext = (next: string | null) => (next?.startsWith('/') && !next.startsWith('//') ? next : '/')
 
 export default function Login() {
 	const token = useAuthStore((state) => state.token)
@@ -56,6 +54,7 @@ export default function Login() {
 								<FieldLabel htmlFor='email'>E-mail</FieldLabel>
 								<Input
 									id='email'
+									placeholder='voce@exemplo.com'
 									type='email'
 									autoComplete='username'
 									value={email}
@@ -68,6 +67,7 @@ export default function Login() {
 								<FieldLabel htmlFor='password'>Senha</FieldLabel>
 								<Input
 									id='password'
+									placeholder='Sua senha'
 									type='password'
 									autoComplete='current-password'
 									value={password}
@@ -85,6 +85,15 @@ export default function Login() {
 								{submitting && <Spinner />}
 								Entrar
 							</Button>
+							<p className='text-center text-sm text-muted-foreground'>
+								Não tem conta?{' '}
+								<Link
+									to={withNext('/register', searchParams.get('next'))}
+									className='font-medium text-foreground underline-offset-4 hover:underline'
+								>
+									Criar conta
+								</Link>
+							</p>
 						</FieldGroup>
 					</form>
 				</CardContent>

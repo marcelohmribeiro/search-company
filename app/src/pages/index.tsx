@@ -43,7 +43,7 @@ export default function Index() {
 			current.map((item, i) => (i >= fromIndex && item.status === 'pending' ? { ...item, status: 'stopped' } : item)),
 		)
 
-	async function handleRun({ city: cityName, combos, maxPages, skipIfDone }: SearchRequest) {
+	async function handleRun({ apiKey, city: cityName, combos, maxPages, skipIfDone }: SearchRequest) {
 		stopRequested.current = false
 		setStopping(false)
 		setRunning(true)
@@ -63,7 +63,7 @@ export default function Index() {
 			updateItem(index, { status: 'running' })
 
 			try {
-				const result = await runSearch({ city: cityName, category, neighborhood, maxPages, skipIfDone })
+				const result = await runSearch({ city: cityName, category, neighborhood, maxPages, skipIfDone }, apiKey)
 				setUsage(result.usage)
 
 				const status: SearchComboStatus = result.skipped

@@ -7,7 +7,7 @@ interface AuthState {
 	token: string | null
 	user: AuthUser | null
 	signIn: (token: string, user: AuthUser) => void
-	/** Troca os dados do usuário (papel, chave do Google) pelos mais recentes da API. */
+	/** Troca os dados do usuário (e-mail, papel) pelos mais recentes da API. */
 	setUser: (user: AuthUser) => void
 	/** Apaga a sessão; as rotas protegidas voltam para o login. */
 	signOut: () => void

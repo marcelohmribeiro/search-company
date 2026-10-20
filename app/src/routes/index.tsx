@@ -8,9 +8,11 @@ import AdminUser from 'src/pages/admin/user'
 import Layout from 'src/pages/layout'
 import Leads from 'src/pages/leads'
 import Login from 'src/pages/login'
+import Register from 'src/pages/register'
 
 export const router = createBrowserRouter([
 	{ path: '/login', element: <Login /> },
+	{ path: '/register', element: <Register /> },
 	{
 		element: <RequireAuth />,
 		children: [

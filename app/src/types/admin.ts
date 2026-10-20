@@ -7,7 +7,6 @@ export interface AdminUser {
 	email: string
 	role: UserRole
 	createdAt: string
-	hasGoogleApiKey: boolean
 	leadsCount: number
 	searchesCount: number
 	accessesCount: number
