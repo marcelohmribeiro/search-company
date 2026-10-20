@@ -205,6 +205,7 @@ Tudo o que a API devolve é guardado. A filtragem (tem site, fechada, nota etc.)
 - **`User`**: quem pode entrar no app.
   - `username` (sempre em minúsculas, de 3 a 30 letras sem acento, números, `.`, `-` ou `_`) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
   - `role`: `ADMIN` ou `USER`.
+- **`ApiToken`**: tokens pessoais do usuário, para ferramentas fora do app (como o Claude). Guarda o nome, o SHA-256 do token (`tokenHash`), os 4 últimos caracteres, a criação e o último uso. O valor do token não é guardado.
 - **`UserAccess`**: as entradas de cada usuário no app (`startedAt` e `lastSeenAt`). Cada `GET /me`, que o front chama ao abrir o app, registra uma entrada; aberturas com menos de 30 minutos de intervalo estendem a mesma.
 
 ### Classificação do `websiteUri` (`api/src/utils/_classifySite.js`)
@@ -227,6 +228,12 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
   - O usuário é gravado em minúsculas e o login não diferencia maiúsculas. A senha precisa ter de 8 a 200 caracteres. Usuário que já existe responde 409.
   - Não há script de terminal para criar usuários. Para tornar alguém admin, altere o `role` dele direto no banco.
 - **Rotas protegidas:** todas, menos `POST /auth/login`, `POST /auth/register` e `GET /`, passam pelo `verifyJWT` (`src/middlewares/auth.js`). Sem token, ou com token inválido ou expirado, a resposta é 401 `{ message }`.
+- **Tokens pessoais** (`src/services/apiTokens.js`), para o Claude ler os leads e atualizar status e anotações sem a senha:
+  - São criados e revogados na tela **Tokens** (`/tokens`), só com a sessão do app. O valor (`sc_` + 32 bytes aleatórios) aparece uma única vez, e o banco guarda só o SHA-256. Cada usuário pode ter até 10.
+  - Valem **só** nas rotas de `/leads`, que usam `verifyJWTOrApiToken`. Em qualquer outra rota (buscas, uso, `/me`, `/me/tokens`, admin), o `verifyJWT` responde 401. Por isso um token nunca faz buscas nem gasta requisições, mesmo sendo de um admin.
+  - Rota nova continua com `verifyJWT`. Só use `verifyJWTOrApiToken` numa rota que o Claude precise chamar e que não gaste requisições.
+  - Revogar apaga o token, e ele para de funcionar na hora. O último uso é gravado no máximo uma vez por minuto.
+  - A skill `proposta-site` (`~/.claude/skills/proposta-site`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do `~/.zshrc`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e tira das anotações o link do site de demonstração.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
 - **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
@@ -249,12 +256,14 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
 - `POST /auth/login` com `{ username, password }`: devolve `{ token, user }`, ou 401 com usuário ou senha errados.
 - `POST /auth/register` com `{ username, password }`: cria a conta (`USER`) e devolve `{ token, user }`. 409 se o usuário já existe.
 - `GET /me`: o usuário logado, `{ id, username, role }`. Registra uma entrada no app.
+- `GET /me/tokens`, `POST /me/tokens` com `{ name }` e `DELETE /me/tokens/:id`: lista, cria e revoga tokens pessoais. Só com a sessão do app. A criação devolve o `token` completo, uma única vez.
 - `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`. Com o header `X-Google-Api-Key`, inclui o que outras contas fizeram com a mesma chave, como a trava conta.
 - `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }` e o header `X-Google-Api-Key`: roda **uma** combinação com essa chave.
   - Sem o header, responde 400.
   - Respostas: 201 com `{ skipped, search, usage }`, 409 com outra busca do usuário em andamento e 429 com a cota dele esgotada.
   - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
 - `GET /searches`: histórico do usuário, com as mais recentes primeiro.
+- As três rotas de `/leads` abaixo aceitam também um token pessoal no `Authorization: Bearer`.
 - `GET /leads`: listagem paginada dos leads do usuário.
   - Filtros: `siteStatus`, `status` e `businessStatus` (aceitam vários valores separados por vírgula), `minRating`, `minReviews`, `city`, `category`, `neighborhood` e `q` (nome).
   - Também aceita `page`, `pageSize` (até 100) e `orderBy` (`reviews`, `rating`, `name` ou `recent`).
@@ -290,6 +299,7 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
     - `{instagram}` vira o perfil da empresa quando o site no Google é o Instagram ("Só Instagram"); `{google_fotos_link}` vira o link das fotos no Maps, ou o da página no Maps.
     - O que faltar continua como marcador no texto, e um aviso pede para completar.
   - Na tabela, o status pode ser trocado direto. O painel lateral de detalhes tem anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações.
+- **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como as duas linhas `export` para o `~/.zshrc` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
   - lista dos usuários com empresas, buscas, requisições no mês, entradas e último acesso;
   - página de cada usuário (`/admin/users/:id`) com esses números, as empresas dele (só leitura, das mais recentes) e as entradas no app.

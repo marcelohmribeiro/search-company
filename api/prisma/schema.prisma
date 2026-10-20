@@ -191,6 +191,7 @@ model User {
   apiRequests  ApiRequest[]
   leads        UserLead[]
   accesses     UserAccess[]
+  apiTokens    ApiToken[]
 }
 
 /// Uma entrada do usuário no app. Aberturas com menos de 30 minutos de intervalo contam como a mesma entrada.
@@ -203,4 +204,22 @@ model UserAccess {
   user       User     @relation(fields: [userId], references: [id])
 
   @@index([userId, startedAt])
+}
+
+/// Token pessoal para ferramentas fora do app (como o Claude) lerem e atualizarem os leads do usuário.
+/// Só serve nas rotas de `/leads`. O valor aparece uma única vez, na criação; o banco guarda só o SHA-256.
+model ApiToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Para o usuário saber onde usou o token (ex.: "Claude no MacBook").
+  name       String
+  tokenHash  String    @unique
+  /// Últimos 4 caracteres, para a tela mostrar qual é.
+  lastChars  String
+  createdAt  DateTime  @default(now())
+  /// Último uso, atualizado no máximo uma vez por minuto.
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
