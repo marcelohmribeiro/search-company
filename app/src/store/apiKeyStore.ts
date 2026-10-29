@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { settings } from 'src/config'
 
 interface ApiKeyState {
 	apiKey: string
@@ -18,7 +19,7 @@ const useApiKeyStore = create<ApiKeyState>()(
 			setRemember: (remember) => set({ remember }),
 		}),
 		{
-			name: 'search-company:google-api-key',
+			name: settings.STORAGE_KEYS.googleApiKey,
 			storage: createJSONStorage(() => localStorage),
 			partialize: (state) => (state.remember ? { apiKey: state.apiKey, remember: true } : { remember: false }),
 		},

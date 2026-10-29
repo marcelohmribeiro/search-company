@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { settings } from 'src/config'
 import type { AuthUser } from 'src/types'
 
 interface AuthState {
@@ -21,7 +22,7 @@ const useAuthStore = create<AuthState>()(
 			signOut: () => set({ token: null, user: null }),
 		}),
 		{
-			name: 'search-company:auth',
+			name: settings.STORAGE_KEYS.auth,
 			storage: createJSONStorage(() => localStorage),
 			partialize: (state) => ({ token: state.token, user: state.user }),
 		},

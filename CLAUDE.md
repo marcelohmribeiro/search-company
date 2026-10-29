@@ -105,7 +105,7 @@ Monorepo `git@github.com-personal:marcelohmribeiro/search-company.git`:
 | Pasta | Stack |
 |---|---|
 | `api/` | Node 22 (ESM, JavaScript), Express 5, Prisma 7 + Postgres 17 (`@prisma/adapter-pg`), zod 4, dotenv, plop |
-| `app/` | React 19, Vite 6, Tailwind CSS v4, shadcn/ui (Radix, preset nova), lucide-react, sonner, React Router 7, Zustand, axios (TSX/TS) |
+| `app/` | React 19, Vite 6, Tailwind CSS v4, shadcn/ui (Radix, preset nova), lucide-react, sonner, React Router 7, Zustand, axios, zod 4 (TSX/TS) |
 
 ### Como rodar
 
@@ -150,7 +150,7 @@ O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois d
   - `PORT` (3333) e `FRONTEND_URL` (`http://localhost:5173`).
   - `JWT_SECRET`: segredo que assina os tokens. **Obrigatório**: sem ele, a API não sobe. Na Vercel, cadastre o mesmo tipo de valor (um segredo longo e aleatório).
   - Opcionais: `MONTHLY_REQUEST_LIMIT` (só baixa o teto de 990), `REQUESTS_PER_MINUTE` (padrão 10) e `PLACES_API_URL` (para apontar a um mock).
-- `app/.env`: `VITE_APP_NAME` e `VITE_API_URL` (`http://localhost:3333`).
+- `app/.env`: `VITE_APP_NAME` e `VITE_API_URL` (`http://localhost:3333`). O `src/config/index.ts` valida as duas com zod (`envSchema.parse`) e exporta `settings`, com elas e as chaves do `localStorage` (`STORAGE_KEYS`). O script do tema no `index.html` repete a chave do tema, porque roda antes do bundle.
 - Os dois `.env` estão no `.gitignore`. A chave do Google não está em nenhum deles: cada usuário a informa no próprio navegador.
 
 ### Convenções
