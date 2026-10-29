@@ -2,7 +2,7 @@
 import { z } from 'zod'
 
 const envSchema = z.object({
-	APP_NAME: z.string(),
+	APP_NAME: z.string().default('Search Company'),
 	API_URL: z.string(),
 })
 

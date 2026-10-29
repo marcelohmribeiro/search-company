@@ -150,7 +150,7 @@ O banco de produção fica no Supabase, no plano grátis: 500 MB, pausa depois d
   - `PORT` (3333) e `FRONTEND_URL` (`http://localhost:5173`).
   - `JWT_SECRET`: segredo que assina os tokens. **Obrigatório**: sem ele, a API não sobe. Na Vercel, cadastre o mesmo tipo de valor (um segredo longo e aleatório).
   - Opcionais: `MONTHLY_REQUEST_LIMIT` (só baixa o teto de 990), `REQUESTS_PER_MINUTE` (padrão 10) e `PLACES_API_URL` (para apontar a um mock).
-- `app/.env`: `VITE_APP_NAME` e `VITE_API_URL` (`http://localhost:3333`). O `src/config/index.ts` valida as duas com zod (`envSchema.parse`) e exporta `settings`, com elas e as chaves do `localStorage` (`STORAGE_KEYS`). O script do tema no `index.html` repete a chave do tema, porque roda antes do bundle.
+- `app/.env`: `VITE_APP_NAME` (opcional, padrão `Search Company`) e `VITE_API_URL` (`http://localhost:3333`). O `src/config/index.ts` valida as duas com zod (`envSchema.parse`) e exporta `settings`, com elas e as chaves do `localStorage` (`STORAGE_KEYS`). O script do tema no `index.html` repete a chave do tema, porque roda antes do bundle.
 - Os dois `.env` estão no `.gitignore`. A chave do Google não está em nenhum deles: cada usuário a informa no próprio navegador.
 
 ### Convenções
