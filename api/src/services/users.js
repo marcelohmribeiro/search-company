@@ -5,7 +5,7 @@ const ACCESS_GAP_MS = 30 * 60_000;
 
 /** Dados do usuário logado. Lança 401 se ele não existe mais. */
 async function getMe(userId) {
-	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, role: true } });
+	const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, role: true, displayName: true } });
 	if (!user) throw httpError(401, "Usuário não encontrado.");
 	return user;
 }
@@ -26,4 +26,9 @@ async function recordAccess(userId) {
 	if (!count) await prisma.userAccess.create({ data: { userId, startedAt: now, lastSeenAt: now } });
 }
 
-export { getMe, isAdmin, recordAccess };
+/** Altera o nome que entra no lugar de `{{vendedor}}` nas mensagens. */
+async function updateMe(userId, data) {
+	return prisma.user.update({ where: { id: userId }, data, select: { id: true, username: true, role: true, displayName: true } });
+}
+
+export { getMe, updateMe, isAdmin, recordAccess };

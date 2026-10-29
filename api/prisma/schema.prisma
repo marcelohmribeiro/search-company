@@ -156,6 +156,7 @@ model UserLead {
   user               User       @relation(fields: [userId], references: [id])
   lead               Lead       @relation(fields: [leadId], references: [id])
   firstSearch        Search?    @relation(fields: [firstSearchId], references: [id])
+  pitch              LeadPitch?
 
   @@id([userId, leadId])
   @@index([leadId])
@@ -186,6 +187,8 @@ model User {
   passwordHash String
   /// `ADMIN` também vê o painel com os usuários, as empresas e as entradas de cada um.
   role         UserRole     @default(USER)
+  /// Nome que entra no lugar de `{{vendedor}}` nas mensagens dos pitches.
+  displayName  String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   searches     Search[]
@@ -223,4 +226,28 @@ model ApiToken {
   lastUsedAt DateTime?
 
   @@index([userId])
+}
+
+/// Plano de venda do site para uma empresa da lista do usuário. Só ele vê.
+model LeadPitch {
+  userId          Int
+  leadId          String
+  /// Link da página de demonstração.
+  demoUrl         String?
+  /// Quem decide (ex.: "Renata Valentim, fundadora e chef").
+  decisionMaker   String?
+  /// WhatsApp para falar com quem decide: número ou link (wa.me, wa.link). Sem ele, vale o telefone do lead.
+  contactWhatsapp String?
+  contactNotes    String?
+  /// Blocos em ordem: `markdown` (title, body), `message` (label, group, dayOffset, body, sentAt) e
+  /// `checklist` (title, items com text e done). Cada bloco tem um `id` estável.
+  blocks          Json       @default("[]")
+  /// Próximo follow-up: envio da mensagem principal + `dayOffset` do primeiro follow-up ainda não enviado.
+  nextFollowUpAt  DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  userLead        UserLead   @relation(fields: [userId, leadId], references: [userId, leadId], onDelete: Cascade)
+
+  @@id([userId, leadId])
+  @@index([userId, nextFollowUpAt])
 }

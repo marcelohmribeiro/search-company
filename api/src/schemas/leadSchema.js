@@ -26,6 +26,7 @@ const leadQuerySchema = z.preprocess(
 		category: z.string().trim().optional(),
 		neighborhood: z.string().trim().optional(),
 		q: z.string().trim().optional(),
+		pitch: z.enum(["has", "none", "due"]).optional(),
 		page: z.coerce.number().int().min(1).default(1),
 		pageSize: z.coerce.number().int().min(1).max(100).default(50),
 		orderBy: z.enum(["reviews", "rating", "name", "recent"]).default("reviews"),

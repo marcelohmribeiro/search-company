@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Ellipsis, Images, MessageCircle, SearchX, StickyNote } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ellipsis, Images, MessageCircle, MessageSquareText, SearchX, StickyNote } from 'lucide-react'
+import { Link } from 'react-router'
 import InstagramIcon from 'src/components/icons/InstagramIcon'
 import LeadRating from 'src/components/leads/LeadRating'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
@@ -18,11 +19,17 @@ import { businessStatusLabel } from 'src/constants/labels'
 import { formatNumber } from 'src/lib/format'
 import { PAGE_SIZE_OPTIONS, pageItems } from 'src/lib/leadQuery'
 import { whatsappUrl } from 'src/lib/phone'
+import { followUpState } from 'src/lib/pitch'
 import type { Lead, LeadStatus } from 'src/types'
 
 const SKELETON_ROWS = 8
 
 const stopRowClick = (event: MouseEvent) => event.stopPropagation()
+
+const FOLLOW_UP_BADGES = {
+	overdue: { label: 'Follow-up atrasado', className: 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300' },
+	today: { label: 'Follow-up hoje', className: 'border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300' },
+}
 
 interface LeadsTableProps {
 	leads: Lead[]
@@ -130,6 +137,8 @@ function LeadsTable({
 								const instagram = lead.siteStatus === 'INSTAGRAM_ONLY' ? lead.websiteUri : null
 								const photos = lead.photosUri ?? lead.googleMapsUri
 								const closed = lead.businessStatus && lead.businessStatus !== 'OPERATIONAL'
+								const followUp = followUpState(lead.pitch?.nextFollowUpAt ?? null)
+								const followUpBadge = followUp && followUp !== 'upcoming' ? FOLLOW_UP_BADGES[followUp] : null
 								return (
 									<TableRow key={lead.id} onClick={() => onOpen(lead)}>
 										<TableCell className='max-w-72 pl-4'>
@@ -147,6 +156,11 @@ function LeadsTable({
 												{closed && (
 													<Badge variant='outline' className='h-4 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 px-1.5 text-[0.65rem] text-red-700 dark:text-red-300'>
 														{businessStatusLabel(lead.businessStatus)}
+													</Badge>
+												)}
+												{followUpBadge && (
+													<Badge variant='outline' className={`h-4 px-1.5 text-[0.65rem] ${followUpBadge.className}`}>
+														{followUpBadge.label}
 													</Badge>
 												)}
 											</div>
@@ -179,6 +193,18 @@ function LeadsTable({
 										</TableCell>
 										<TableCell className='pr-4' onClick={stopRowClick}>
 											<div className='flex justify-end gap-0.5'>
+												{lead.pitch && (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<Button variant='ghost' size='icon-sm' asChild>
+																<Link to={`/leads/${encodeURIComponent(lead.id)}/venda`} aria-label='Abrir plano de venda'>
+																	<MessageSquareText className='text-primary' />
+																</Link>
+															</Button>
+														</TooltipTrigger>
+														<TooltipContent>Abrir plano de venda</TooltipContent>
+													</Tooltip>
+												)}
 												{whatsapp && (
 													<IconLink href={whatsapp} label='Conversar no WhatsApp'>
 														<MessageCircle className='text-green-600 dark:text-green-400' />

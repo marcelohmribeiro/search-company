@@ -1,4 +1,4 @@
-import { listLeads, getLeadFilterOptions, updateLead } from "#src/services";
+import { listLeads, getLead, getLeadFilterOptions, updateLead } from "#src/services";
 import { leadQuerySchema, leadUpdateSchema } from "#src/schemas";
 
 const LeadController = () => {
@@ -23,6 +23,16 @@ const LeadController = () => {
     }
   }
 
+  async function show(req, res, next) {
+    try {
+      const data = await getLead(req.user.id, req.params.id);
+
+      return res.status(200).json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async function update(req, res, next) {
     try {
       const data = await updateLead(req.user.id, req.params.id, leadUpdateSchema.parse(req.body ?? {}));
@@ -36,6 +46,7 @@ const LeadController = () => {
   return {
     findAll,
     filterOptions,
+    show,
     update,
   };
 };

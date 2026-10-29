@@ -1,4 +1,4 @@
-import type { BusinessStatus, LeadOrder, LeadStatus, SearchStatus, SiteStatus, UserRole } from 'src/types'
+import type { BusinessStatus, LeadOrder, LeadStatus, PitchFilter, PitchMessageGroup, SearchStatus, SiteStatus, UserRole } from 'src/types'
 
 interface Option<T> {
 	value: T
@@ -70,4 +70,16 @@ export const leadStatusOption = (value: LeadStatus) =>
 export const ROLE_LABELS: Record<UserRole, string> = {
 	ADMIN: 'Administrador',
 	USER: 'Usuário',
+}
+
+export const PITCH_FILTER_OPTIONS: Option<Exclude<PitchFilter, ''>>[] = [
+	{ value: 'has', label: 'Com plano' },
+	{ value: 'none', label: 'Sem plano' },
+	{ value: 'due', label: 'Follow-up vencido' },
+]
+
+export const PITCH_GROUP_LABELS: Record<PitchMessageGroup, string> = {
+	main: 'Mensagem principal',
+	followup: 'Follow-up',
+	alternative: 'Sequência alternativa',
 }

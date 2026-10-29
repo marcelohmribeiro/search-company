@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { CalendarClock, Clock, ExternalLink, Globe, Images, MapPin, MessageCircle, Phone, Star, Wallet } from 'lucide-react'
+import { CalendarClock, Clock, ExternalLink, Globe, Images, MapPin, MessageCircle, MessageSquareText, Phone, Star, Wallet } from 'lucide-react'
+import { Link } from 'react-router'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
@@ -118,6 +119,12 @@ function LeadDetail({ lead, onSaved, onClose }: { lead: Lead; onSaved: (lead: Le
 							</a>
 						</Button>
 					)}
+					<Button variant='outline' className='col-span-3' asChild>
+						<Link to={`/leads/${encodeURIComponent(lead.id)}/venda`}>
+							<MessageSquareText />
+							{lead.pitch ? 'Abrir plano de venda' : 'Criar plano de venda'}
+						</Link>
+					</Button>
 					{whatsapp && !mobile && (
 						<p className='col-span-3 text-xs text-muted-foreground'>
 							O telefone parece fixo e pode não ter WhatsApp.

@@ -20,4 +20,14 @@ const registerSchema = z.object({
 		.max(200, "A senha pode ter no máximo 200 caracteres."),
 });
 
-export { loginSchema, registerSchema };
+/** Corpo de `PATCH /me`: `displayName` vazio vira `null`. */
+const meUpdateSchema = z.object({
+	displayName: z
+		.string()
+		.trim()
+		.max(80)
+		.nullable()
+		.transform((name) => (name ? name : null)),
+});
+
+export { meUpdateSchema, loginSchema, registerSchema };

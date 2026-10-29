@@ -1,7 +1,7 @@
 import { prisma } from "./prisma.js";
 import { httpError, placeToLead } from "#src/utils";
 
-const WITH_LEAD = { lead: { omit: { googleData: true } } };
+const WITH_LEAD = { lead: { omit: { googleData: true } }, pitch: { select: { nextFollowUpAt: true } } };
 
 const ORDER_BY = {
 	reviews: [
@@ -19,8 +19,8 @@ const ORDER_BY = {
 };
 
 /** Junta os dados do `Lead` com o acompanhamento do usuário (`UserLead`). */
-function toUserLead({ lead, userId, leadId, firstSearchId, ...tracking }) {
-	return { ...lead, ...tracking };
+function toUserLead({ lead, userId, leadId, firstSearchId, pitch = null, ...tracking }) {
+	return { ...lead, ...tracking, pitch };
 }
 
 function buildWhere(userId, filters) {
@@ -33,6 +33,9 @@ function buildWhere(userId, filters) {
 
 	const where = { userId, lead };
 	if (filters.status?.length) where.status = { in: filters.status };
+	if (filters.pitch === "has") where.pitch = { isNot: null };
+	if (filters.pitch === "none") where.pitch = { is: null };
+	if (filters.pitch === "due") where.pitch = { is: { nextFollowUpAt: { lte: new Date() } } };
 	if (filters.city) where.city = { equals: filters.city, mode: "insensitive" };
 	if (filters.category) where.category = { equals: filters.category, mode: "insensitive" };
 	if (filters.neighborhood) {
@@ -72,6 +75,13 @@ async function getLeadFilterOptions(userId) {
 		categories: sorted(rows.map((row) => row.category)),
 		neighborhoods: sorted(rows.flatMap((row) => [row.lead.neighborhood, row.searchNeighborhood])),
 	};
+}
+
+/** Um lead da lista do usuário. Lança 404 se ele não está na lista. */
+async function getLead(userId, id) {
+	const row = await prisma.userLead.findUnique({ where: { userId_leadId: { userId, leadId: id } }, include: WITH_LEAD });
+	if (!row) throw httpError(404, "Empresa não encontrada na sua lista.");
+	return toUserLead(row);
 }
 
 /** Atualiza status e anotações do lead na lista do usuário. Lança 404 se ele não está na lista. */
@@ -139,4 +149,4 @@ async function saveSearchLeads(places, search, page) {
 	return results.at(-1).count;
 }
 
-export { listLeads, getLeadFilterOptions, updateLead, listSearchLeads, saveSearchLeads };
+export { listLeads, getLead, getLeadFilterOptions, updateLead, listSearchLeads, saveSearchLeads };

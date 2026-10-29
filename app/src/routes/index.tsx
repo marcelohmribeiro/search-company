@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
 				children: [
 					{ index: true, element: <Index /> },
 					{ path: 'leads', element: <Leads /> },
+					{ path: 'leads/:id/venda', lazy: () => import('src/pages/leads/pitch').then(({ default: Component }) => ({ Component })) },
 					{ path: 'tokens', element: <Tokens /> },
 					{
 						path: 'admin',

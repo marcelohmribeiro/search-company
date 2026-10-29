@@ -13,10 +13,11 @@ import {
 	LEAD_ORDER_OPTIONS,
 	LEAD_STATUS_OPTIONS,
 	MIN_RATING_OPTIONS,
+	PITCH_FILTER_OPTIONS,
 	SITE_STATUS_OPTIONS,
 } from 'src/constants/labels'
 import { cn } from 'src/lib/utils'
-import type { BusinessStatus, LeadFilterOptions, LeadFilters as Filters, LeadOrder, LeadStatus, SiteStatus } from 'src/types'
+import type { BusinessStatus, LeadFilterOptions, LeadFilters as Filters, LeadOrder, LeadStatus, PitchFilter, SiteStatus } from 'src/types'
 
 const ALL = 'all'
 
@@ -201,6 +202,23 @@ function LeadFilters({ filters, options, onChange, onReset }: LeadFiltersProps) 
 							onValueChange={(value) => onChange({ businessStatus: value as BusinessStatus[] })}
 						>
 							{BUSINESS_STATUS_OPTIONS.map((option) => (
+								<ToggleGroupItem key={option.value} value={option.value} className={CHIP_CLASS}>
+									{option.label}
+								</ToggleGroupItem>
+							))}
+						</ToggleGroup>
+					</ChipRow>
+					<ChipRow label='Plano de venda'>
+						<ToggleGroup
+							type='single'
+							variant='outline'
+							size='sm'
+							spacing={1.5}
+							className='flex-wrap'
+							value={filters.pitch}
+							onValueChange={(value) => onChange({ pitch: value as PitchFilter })}
+						>
+							{PITCH_FILTER_OPTIONS.map((option) => (
 								<ToggleGroupItem key={option.value} value={option.value} className={CHIP_CLASS}>
 									{option.label}
 								</ToggleGroupItem>

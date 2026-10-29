@@ -1,3 +1,5 @@
+import type { PitchFilter } from './pitch'
+
 export type SiteStatus =
 	| 'NO_WEBSITE'
 	| 'INSTAGRAM_ONLY'
@@ -41,6 +43,8 @@ export interface Lead {
 	notes: string | null
 	firstSeenAt: string
 	lastSeenAt: string
+	/** Só o próximo follow-up; `null` sem plano de venda. */
+	pitch: { nextFollowUpAt: string | null } | null
 }
 
 export interface LeadFilters {
@@ -53,6 +57,7 @@ export interface LeadFilters {
 	category: string
 	neighborhood: string
 	q: string
+	pitch: PitchFilter
 	orderBy: LeadOrder
 }
 

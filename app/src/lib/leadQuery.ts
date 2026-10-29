@@ -1,4 +1,11 @@
-import { BUSINESS_STATUS_OPTIONS, LEAD_ORDER_OPTIONS, LEAD_STATUS_OPTIONS, MIN_RATING_OPTIONS, SITE_STATUS_OPTIONS } from 'src/constants/labels'
+import {
+	BUSINESS_STATUS_OPTIONS,
+	LEAD_ORDER_OPTIONS,
+	LEAD_STATUS_OPTIONS,
+	MIN_RATING_OPTIONS,
+	PITCH_FILTER_OPTIONS,
+	SITE_STATUS_OPTIONS,
+} from 'src/constants/labels'
 import type { LeadFilters } from 'src/types'
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100]
@@ -15,6 +22,7 @@ export const DEFAULT_FILTERS: LeadFilters = {
 	category: '',
 	neighborhood: '',
 	q: '',
+	pitch: '',
 	orderBy: 'reviews',
 }
 
@@ -56,6 +64,7 @@ export function parseLeadQuery(params: URLSearchParams): LeadQuery {
 			businessStatus: readList(params, 'businessStatus', BUSINESS_STATUS_OPTIONS, []),
 			minRating: MIN_RATING_OPTIONS.some((option) => option.value === minRating) ? minRating : '',
 			minReviews: /^\d+$/.test(minReviews) ? minReviews : '',
+			pitch: PITCH_FILTER_OPTIONS.find((option) => option.value === params.get('pitch'))?.value ?? '',
 			orderBy: orderBy ?? DEFAULT_FILTERS.orderBy,
 		},
 		page: readPositiveInt(params.get('page'), 1),
@@ -75,6 +84,7 @@ export function buildLeadSearchParams({ filters, page, pageSize }: LeadQuery) {
 	if (filters.businessStatus.length) params.set('businessStatus', filters.businessStatus.join(','))
 	if (filters.minRating) params.set('minRating', filters.minRating)
 	if (filters.minReviews) params.set('minReviews', filters.minReviews)
+	if (filters.pitch) params.set('pitch', filters.pitch)
 	if (filters.orderBy !== DEFAULT_FILTERS.orderBy) params.set('orderBy', filters.orderBy)
 	if (page > 1) params.set('page', String(page))
 	if (pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(pageSize))

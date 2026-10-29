@@ -7,3 +7,4 @@ export * from "./auth.js";
 export * from "./users.js";
 export * from "./admin.js";
 export * from "./apiTokens.js";
+export * from "./pitches.js";

@@ -217,10 +217,16 @@ Tudo o que a API devolve é guardado. A filtragem (tem site, fechada, nota etc.)
   - Busca de origem: `city`, `category`, `searchNeighborhood` e `firstSearchId`, da primeira busca **desse usuário** que trouxe a empresa. `firstSeenAt` é quando ela entrou na lista dele.
   - Esses campos nunca são sobrescritos por uma busca.
   - A API devolve o lead "achatado": os campos do `Lead` com os do `UserLead` por cima (`toUserLead` em `src/services/leads.js`).
+- **`LeadPitch`**: o plano de venda do site para uma empresa da lista de um usuário (chave: usuário + `leadId`, apagado junto com o `UserLead`). Só o dono vê.
+  - Cabeçalho: `demoUrl`, `decisionMaker`, `contactWhatsapp` (número ou link; sem ele, as mensagens usam o telefone do Google) e `contactNotes`.
+  - `blocks`: lista ordenada de blocos com `id` estável, de três tipos: `markdown` (título e texto: brief, SPIN, preço, objeções), `message` (rótulo, `group` `main`/`followup`/`alternative`, `dayOffset`, texto e `sentAt`) e `checklist` (itens com `done`).
+  - `nextFollowUpAt`: envio da mensagem principal + `dayOffset` do primeiro follow-up ainda não enviado. A sequência alternativa não entra. É recalculado a cada gravação (`src/services/pitches.js`).
+  - As mensagens usam `{{vendedor}}` no lugar do nome de quem vende, trocado pelo `User.displayName` ao exibir e copiar.
 - **`SearchLead`**: quais empresas cada busca trouxe, com a página e a data.
 - **`User`**: quem pode entrar no app.
   - `username` (sempre em minúsculas, de 3 a 30 letras sem acento, números, `.`, `-` ou `_`) e `passwordHash` (`salt:hash` do scrypt). A senha nunca é guardada.
   - `role`: `ADMIN` ou `USER`.
+  - `displayName`: o nome que entra no lugar de `{{vendedor}}` nas mensagens dos pitches.
 - **`ApiToken`**: tokens pessoais do usuário, para ferramentas fora do app (como o Claude). Guarda o nome, o SHA-256 do token (`tokenHash`), os 4 últimos caracteres, a criação e o último uso. O valor do token não é guardado.
 - **`UserAccess`**: as entradas de cada usuário no app (`startedAt` e `lastSeenAt`). Cada `GET /me`, que o front chama ao abrir o app, registra uma entrada; aberturas com menos de 30 minutos de intervalo estendem a mesma.
 
@@ -249,7 +255,7 @@ Os subdomínios contam como o domínio principal: `m.facebook.com` também é Fa
   - Valem **só** nas rotas de `/leads`, que usam `verifyJWTOrApiToken`. Em qualquer outra rota (buscas, uso, `/me`, `/me/tokens`, admin), o `verifyJWT` responde 401. Por isso um token nunca faz buscas nem gasta requisições, mesmo sendo de um admin.
   - Rota nova continua com `verifyJWT`. Só use `verifyJWTOrApiToken` numa rota que o Claude precise chamar e que não gaste requisições.
   - Revogar apaga o token, e ele para de funcionar na hora. O último uso é gravado no máximo uma vez por minuto.
-  - A skill `proposta-site` (`~/.claude/skills/proposta-site`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do bloco `env` do `~/.claude/settings.json`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e tira das anotações o link do site de demonstração.
+  - A skill `landing-page` (repositório `claude-skills`, `scripts/leads.py`) lê `SEARCH_COMPANY_API_URL` e `SEARCH_COMPANY_TOKEN` do bloco `env` do `~/.claude/settings.json`, busca os leads "Fazendo" (`GET /leads?status=IN_PROGRESS`) e envia o plano de venda pelo `PUT /leads/:id/pitch`, em vez de gravar um md.
 - **Cada usuário só vê o que é dele:** leads, filtros, buscas, histórico e uso do mês saem sempre do `req.user.id`.
 - **Admin:** as rotas `/admin` passam também pelo `requireAdmin` (`src/middlewares/admin.js`), que lê o papel no banco a cada chamada (`isAdmin`) e responde 403 para quem não é admin.
   - O admin tem a própria lista, como qualquer usuário, e vê a dos outros só pelo painel, sem poder alterar.
@@ -271,7 +277,8 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
 
 - `POST /auth/login` com `{ username, password }`: devolve `{ token, user }`, ou 401 com usuário ou senha errados.
 - `POST /auth/register` com `{ username, password }`: cria a conta (`USER`) e devolve `{ token, user }`. 409 se o usuário já existe.
-- `GET /me`: o usuário logado, `{ id, username, role }`. Registra uma entrada no app.
+- `GET /me`: o usuário logado, `{ id, username, role, displayName }`. Registra uma entrada no app.
+- `PATCH /me` com `{ displayName }`: altera o nome usado em `{{vendedor}}`. Vazio vira `null`.
 - `GET /me/tokens`, `POST /me/tokens` com `{ name }` e `DELETE /me/tokens/:id`: lista, cria e revoga tokens pessoais. Só com a sessão do app. A criação devolve o `token` completo, uma única vez.
 - `GET /usage`: uso do mês do usuário, `{ period, used, limit, remaining }`. Com o header `X-Google-Api-Key`, inclui o que outras contas fizeram com a mesma chave, como a trava conta.
 - `POST /searches` com `{ city, category, neighborhood?, maxPages (1–3, padrão 3), skipIfDone (padrão true) }` e o header `X-Google-Api-Key`: roda **uma** combinação com essa chave.
@@ -280,13 +287,19 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
 - `GET /searches`: histórico do usuário, com as mais recentes primeiro.
 - `GET /searches/:id/leads`: `{ search, items }` com as empresas que uma busca do usuário trouxe, no formato de `GET /leads` mais `page` (página da busca) e `isNew` (foi essa busca que a colocou na lista). Ordem: página e, dentro dela, mais avaliações. 404 se a busca é de outro usuário.
-- As três rotas de `/leads` abaixo aceitam também um token pessoal no `Authorization: Bearer`.
+- Todas as rotas de `/leads` abaixo aceitam também um token pessoal no `Authorization: Bearer`.
 - `GET /leads`: listagem paginada dos leads do usuário.
-  - Filtros: `siteStatus`, `status` e `businessStatus` (aceitam vários valores separados por vírgula), `minRating`, `minReviews`, `city`, `category`, `neighborhood` e `q` (nome).
+  - Filtros: `siteStatus`, `status` e `businessStatus` (aceitam vários valores separados por vírgula), `minRating`, `minReviews`, `city`, `category`, `neighborhood`, `q` (nome) e `pitch` (`has`, `none` ou `due`, com o follow-up já vencido).
+  - Cada lead traz `pitch: { nextFollowUpAt }`, ou `null` sem plano de venda.
   - Também aceita `page`, `pageSize` (até 100) e `orderBy` (`reviews`, `rating`, `name` ou `recent`).
   - Todas as ordenações terminam no `leadId`, para a paginação não repetir nem pular empresas empatadas.
 - `GET /leads/filters`: cidades, categorias e bairros dos leads do usuário.
+- `GET /leads/:id`: um lead da lista do usuário, no formato de `GET /leads`. 404 se a empresa não está na lista dele.
 - `PATCH /leads/:id`: altera só `status` e `notes` do lead **na lista do usuário**. 404 se a empresa não está na lista dele.
+- `GET /leads/:id/pitch`: o plano de venda, ou `null`.
+- `PUT /leads/:id/pitch` com `{ demoUrl, decisionMaker, contactWhatsapp, contactNotes, blocks }`: cria ou substitui o plano. Blocos e itens sem `id` ganham um; num bloco de mesmo `id`, `sentAt` e `done` omitidos mantêm o valor salvo.
+- `PATCH /leads/:id/pitch/blocks/:blockId` com `{ sent }` (mensagem) ou `{ itemId, done }` (checklist).
+- `DELETE /leads/:id/pitch`: apaga o plano.
 - Só admin (403 para os outros):
   - `GET /admin/users`: todos os usuários, com empresas, buscas, uso do mês, entradas, último acesso e se têm chave.
   - `GET /admin/users/:id`: um usuário, com os mesmos números.
@@ -316,6 +329,10 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Clicar em qualquer parte da linha abre os detalhes da empresa no painel lateral (`LeadDetailSheet`), com anotações, informações do Google e atalhos para WhatsApp, Maps, fotos e avaliações. O status pode ser trocado direto na tabela: o select, os links e os botões da linha não abrem o painel.
   - A coluna Ações tem só atalhos: WhatsApp (com telefone), Instagram (quando o site no Google é o Instagram) e fotos no Google (`photosUri`, ou a página no Maps).
   - A tabela e os filtros são memorizados (`memo`) e recebem funções estáveis (`useCallback`), para abrir e fechar o painel não redesenhar todas as linhas.
+- **Plano de venda (`/leads/:id/venda`)** (`src/pages/leads/pitch.tsx`, `src/components/pitch/`, `src/lib/pitch.ts`), aberto pelo painel do lead ou pelo ícone na coluna Ações:
+  - o cabeçalho com a demonstração e o contato, e os blocos, cada um editável no lugar, com setas para reordenar e remoção. O markdown é renderizado com `react-markdown` + `remark-gfm` (tabelas);
+  - nas mensagens, "Copiar e abrir WhatsApp" copia o texto, abre o WhatsApp do contato e marca como enviada; "Copiar" só copia. Se o texto tem `{{vendedor}}` e o usuário não tem `displayName`, um aviso pede o nome antes de copiar (ou copia mesmo assim);
+  - os follow-ups mostram a data de envio, e a lista de leads mostra "Follow-up hoje"/"Follow-up atrasado" e o chip "Plano de venda" (com plano, sem plano, follow-up vencido).
 - **Tokens (`/tokens`)** (`src/pages/tokens/`, `src/components/tokens/`): cria um token com nome, mostra o valor uma vez já como o bloco `env` para o `~/.claude/settings.json` e lista os tokens com o fim, a criação, o último uso e o botão "Revogar".
 - **Admin (`/admin`)**, só para o administrador (`src/pages/admin/`, `src/components/admin/`):
   - lista dos usuários com empresas, buscas, requisições no mês, entradas e último acesso;

@@ -7,3 +7,4 @@ export * from "./leadSchema.js";
 export * from "./authSchema.js";
 export * from "./adminSchema.js";
 export * from "./apiTokenSchema.js";
+export * from "./pitchSchema.js";

@@ -6,7 +6,7 @@ function leadFiltersToParams(filters: LeadFilters) {
 	if (filters.siteStatus.length) params.set('siteStatus', filters.siteStatus.join(','))
 	if (filters.status.length) params.set('status', filters.status.join(','))
 	if (filters.businessStatus.length) params.set('businessStatus', filters.businessStatus.join(','))
-	for (const key of ['minRating', 'minReviews', 'city', 'category', 'neighborhood', 'q', 'orderBy'] as const) {
+	for (const key of ['minRating', 'minReviews', 'city', 'category', 'neighborhood', 'q', 'pitch', 'orderBy'] as const) {
 		const value = filters[key].trim()
 		if (value) params.set(key, value)
 	}
