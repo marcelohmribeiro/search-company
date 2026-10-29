@@ -41,7 +41,7 @@ export default function SellerNameDialog({ open, onOpenChange, onSave, onCopyAny
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
-			<AlertDialogContent>
+			<AlertDialogContent className='data-[size=default]:sm:max-w-md'>
 				<form onSubmit={handleSubmit} className='space-y-4'>
 					<AlertDialogHeader>
 						<AlertDialogTitle>A mensagem vai sem o seu nome</AlertDialogTitle>
