@@ -4,10 +4,11 @@ import { RouterProvider } from 'react-router'
 import { ThemeProvider } from 'next-themes'
 import './css/index.css'
 import { router } from './routes'
+import { settings } from './config'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider attribute='class' defaultTheme='system' enableSystem storageKey='search-company:theme' disableTransitionOnChange>
+    <ThemeProvider attribute='class' defaultTheme='system' enableSystem storageKey={settings.STORAGE_KEYS.theme} disableTransitionOnChange>
       <RouterProvider router={router} />
     </ThemeProvider>
   </StrictMode>,
