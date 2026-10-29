@@ -11,9 +11,8 @@ import type { LeadFilters } from 'src/types'
 export const PAGE_SIZE_OPTIONS = [25, 50, 100]
 export const DEFAULT_PAGE_SIZE = 50
 
-/** Por padrão, "Tem site" fica de fora. */
 export const DEFAULT_FILTERS: LeadFilters = {
-	siteStatus: SITE_STATUS_OPTIONS.map((option) => option.value).filter((value) => value !== 'HAS_WEBSITE'),
+	siteStatus: [],
 	status: [],
 	businessStatus: [],
 	minRating: '',
@@ -34,11 +33,9 @@ export interface LeadQuery {
 
 const TEXT_KEYS = ['q', 'city', 'category', 'neighborhood'] as const
 
-const sameItems = (a: string[], b: string[]) => a.length === b.length && a.every((item) => b.includes(item))
-
-function readList<T extends string>(params: URLSearchParams, key: string, allowed: { value: T }[], fallback: T[]) {
+function readList<T extends string>(params: URLSearchParams, key: string, allowed: { value: T }[]) {
 	const raw = params.get(key)
-	if (raw === null) return fallback
+	if (!raw) return []
 	const values = allowed.map((option) => option.value)
 	return raw.split(',').filter((item): item is T => values.includes(item as T))
 }
@@ -59,9 +56,9 @@ export function parseLeadQuery(params: URLSearchParams): LeadQuery {
 		filters: {
 			...DEFAULT_FILTERS,
 			...Object.fromEntries(TEXT_KEYS.map((key) => [key, params.get(key) ?? ''])),
-			siteStatus: readList(params, 'siteStatus', SITE_STATUS_OPTIONS, DEFAULT_FILTERS.siteStatus),
-			status: readList(params, 'status', LEAD_STATUS_OPTIONS, []),
-			businessStatus: readList(params, 'businessStatus', BUSINESS_STATUS_OPTIONS, []),
+			siteStatus: readList(params, 'siteStatus', SITE_STATUS_OPTIONS),
+			status: readList(params, 'status', LEAD_STATUS_OPTIONS),
+			businessStatus: readList(params, 'businessStatus', BUSINESS_STATUS_OPTIONS),
 			minRating: MIN_RATING_OPTIONS.some((option) => option.value === minRating) ? minRating : '',
 			minReviews: /^\d+$/.test(minReviews) ? minReviews : '',
 			pitch: PITCH_FILTER_OPTIONS.find((option) => option.value === params.get('pitch'))?.value ?? '',
@@ -79,7 +76,7 @@ export function buildLeadSearchParams({ filters, page, pageSize }: LeadQuery) {
 		const value = filters[key].trim()
 		if (value) params.set(key, value)
 	}
-	if (!sameItems(filters.siteStatus, DEFAULT_FILTERS.siteStatus)) params.set('siteStatus', filters.siteStatus.join(','))
+	if (filters.siteStatus.length) params.set('siteStatus', filters.siteStatus.join(','))
 	if (filters.status.length) params.set('status', filters.status.join(','))
 	if (filters.businessStatus.length) params.set('businessStatus', filters.businessStatus.join(','))
 	if (filters.minRating) params.set('minRating', filters.minRating)

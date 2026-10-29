@@ -316,9 +316,9 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Clicar numa busca do histórico abre um modal (`SearchLeadsDialog`) com as empresas que ela trouxe: nota, situação do site, status e página, com o selo "Nova" nas que entraram na lista por ela. Clicar numa empresa abre o painel de detalhes dela.
 - **Leads (`/leads`):**
   - Filtros em chips (situação do site, status e funcionamento) e campos para nome, cidade, categoria, bairro, nota mínima, mínimo de avaliações e ordenação.
-  - Por padrão, "Tem site" vem desmarcado e os outros chips mostram tudo. Isso só esconde da tela: os dados continuam no banco.
+  - Por padrão, nenhum chip vem marcado e a lista mostra todas as empresas. Cada chip marcado restringe a lista; os filtros só escondem da tela, e os dados continuam no banco.
   - **O estado da tela fica na URL** (`/leads?q=…&siteStatus=…&page=3&pageSize=25`), por `src/lib/leadQuery.ts` e pelo hook `useLeadQuery`:
-    - A URL só guarda o que difere do padrão. `siteStatus=` vazio significa "nenhuma situação marcada" (mostra todas), e a ausência do parâmetro significa o padrão.
+    - A URL só guarda o que difere do padrão: sem `siteStatus`, `status` ou `businessStatus`, nenhum chip está marcado.
     - Recarregar, abrir em outra aba e usar voltar/avançar mantêm filtros e página.
     - Mudar de página cria uma entrada no histórico. Mudar filtros só substitui a URL atual.
     - Os campos digitados (nome e mínimo de avaliações) só vão para a URL e para a API depois de 300 ms sem digitar.
