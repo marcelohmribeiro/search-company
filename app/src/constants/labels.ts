@@ -16,6 +16,7 @@ export const SITE_STATUS_OPTIONS: (Option<SiteStatus> & { className: string; dot
 
 export const LEAD_STATUS_OPTIONS: (Option<LeadStatus> & { dotClassName: string })[] = [
 	{ value: 'NEW', label: 'Novo', dotClassName: 'bg-sky-500' },
+	{ value: 'TODO', label: 'A Fazer', dotClassName: 'bg-indigo-500' },
 	{ value: 'IN_PROGRESS', label: 'Fazendo', dotClassName: 'bg-orange-500' },
 	{ value: 'DONE', label: 'Feito', dotClassName: 'bg-teal-500' },
 	{ value: 'CONTACTED', label: 'Contatado', dotClassName: 'bg-amber-500' },
