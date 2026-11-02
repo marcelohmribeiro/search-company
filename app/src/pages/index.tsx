@@ -27,6 +27,7 @@ export default function Index() {
 						searches={history.data ?? []}
 						loading={history.loading && !history.data}
 						error={history.error}
+						onDeleted={history.reload}
 					/>
 				</div>
 			</div>

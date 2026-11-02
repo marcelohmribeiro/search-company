@@ -24,6 +24,8 @@ export interface Search {
 	error: string | null
 	createdAt: string
 	finishedAt: string | null
+	/** Nenhuma empresa que ela trouxe teve status, anotações ou plano de venda alterados. */
+	deletable: boolean
 }
 
 export interface SearchInput {

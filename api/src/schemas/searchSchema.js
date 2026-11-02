@@ -19,7 +19,7 @@ const googleApiKeySchema = z
 	.max(200, "Chave da API do Google inválida.")
 	.regex(/^\S+$/, "A chave da API do Google não tem espaços.");
 
-/** `:id` de `GET /searches/:id/leads`. */
+/** `:id` de `GET /searches/:id/leads` e `DELETE /searches/:id`. */
 const searchIdSchema = z.coerce.number().int().positive();
 
 export { searchInputSchema, googleApiKeySchema, searchIdSchema };

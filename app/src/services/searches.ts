@@ -16,3 +16,7 @@ export async function fetchSearchLeads(id: number) {
 	const { data } = await api.get<SearchLeads>(`/searches/${id}/leads`)
 	return data
 }
+
+export async function deleteSearch(id: number) {
+	await api.delete(`/searches/${id}`)
+}

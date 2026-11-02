@@ -100,9 +100,60 @@ async function runSearch(userId, { city, category, neighborhood, maxPages, skipI
 	}
 }
 
-/** Buscas do usuário, as mais recentes primeiro. */
+const touchedLead = { OR: [{ status: { not: "NEW" } }, { notes: { not: null } }, { pitch: { isNot: null } }] };
+
+/** Buscas do usuário, as mais recentes primeiro, com `deletable` quando nenhuma empresa que ela trouxe foi mexida. */
 async function listSearches(userId, take = 100) {
-	return prisma.search.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take });
+	const searches = await prisma.search.findMany({
+		where: { userId },
+		orderBy: { createdAt: "desc" },
+		take,
+		include: { _count: { select: { userLeads: { where: touchedLead } } } },
+	});
+	return searches.map(({ _count, ...search }) => ({ ...search, deletable: search.status !== "RUNNING" && _count.userLeads === 0 }));
 }
 
-export { runSearch, listSearches };
+/**
+ * Apaga uma busca do usuário. As empresas que ela trouxe primeiro passam para a próxima busca dele que as trouxe,
+ * ou saem da lista. As requisições continuam no banco, sem a busca. Lança 409 se alguma empresa já foi mexida.
+ */
+async function deleteSearch(userId, id) {
+	return prisma.$transaction(async (tx) => {
+		const search = await tx.search.findFirst({ where: { id, userId } });
+		if (!search) throw httpError(404, "Busca não encontrada.");
+		if (search.status === "RUNNING") throw httpError(409, "A busca ainda está em andamento.");
+		if (await tx.userLead.count({ where: { firstSearchId: id, ...touchedLead } }))
+			throw httpError(409, "Essa busca trouxe empresas que já tiveram o status, anotações ou plano de venda alterados.");
+
+		await tx.apiRequest.updateMany({ where: { searchId: id }, data: { searchId: null } });
+		await tx.searchLead.deleteMany({ where: { searchId: id } });
+
+		const userLeads = await tx.userLead.findMany({ where: { userId, firstSearchId: id }, select: { leadId: true } });
+		const others = await tx.searchLead.findMany({
+			where: { leadId: { in: userLeads.map((userLead) => userLead.leadId) }, search: { userId } },
+			orderBy: { createdAt: "asc" },
+			include: { search: true },
+		});
+		const nextSearch = new Map();
+		for (const { leadId, createdAt, search: other } of others) if (!nextSearch.has(leadId)) nextSearch.set(leadId, { createdAt, other });
+
+		for (const { leadId } of userLeads) {
+			const next = nextSearch.get(leadId);
+			if (!next) continue;
+			await tx.userLead.update({
+				where: { userId_leadId: { userId, leadId } },
+				data: {
+					firstSearchId: next.other.id,
+					city: next.other.city,
+					category: next.other.category,
+					searchNeighborhood: next.other.neighborhood,
+					firstSeenAt: next.createdAt,
+				},
+			});
+		}
+		await tx.userLead.deleteMany({ where: { userId, firstSearchId: id } });
+		await tx.search.delete({ where: { id } });
+	});
+}
+
+export { runSearch, listSearches, deleteSearch };

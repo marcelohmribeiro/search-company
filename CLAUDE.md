@@ -285,7 +285,8 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Sem o header, responde 400.
   - Respostas: 201 com `{ skipped, search, usage }`, 409 com outra busca do usuário em andamento e 429 com a cota dele esgotada.
   - Com `skipIfDone`, uma busca **do próprio usuário** com o mesmo texto, que já terminou e cobriu as páginas pedidas, é pulada sem gastar requisição. A mesma busca feita por outro usuário não conta.
-- `GET /searches`: histórico do usuário, com as mais recentes primeiro.
+- `GET /searches`: histórico do usuário, com as mais recentes primeiro. Cada busca traz `deletable`: nenhuma empresa que ela trouxe primeiro teve status, anotações ou plano de venda alterados.
+- `DELETE /searches/:id`: apaga a busca (409 se não é `deletable`). As empresas que ela trouxe primeiro passam para a próxima busca do usuário que as trouxe, ou saem da lista dele. As linhas de `ApiRequest` ficam, sem a busca, e continuam contando no mês.
 - `GET /searches/:id/leads`: `{ search, items }` com as empresas que uma busca do usuário trouxe, no formato de `GET /leads` mais `page` (página da busca) e `isNew` (foi essa busca que a colocou na lista). Ordem: página e, dentro dela, mais avaliações. 404 se a busca é de outro usuário.
 - Todas as rotas de `/leads` abaixo aceitam também um token pessoal no `Authorization: Bearer`.
 - `GET /leads`: listagem paginada dos leads do usuário.
@@ -314,6 +315,7 @@ Todos, menos `POST /auth/login`, `POST /auth/register` e `GET /`, exigem o heade
   - Mostra a estimativa de custo (combinações × páginas) e pede confirmação num diálogo antes de rodar.
   - Roda as combinações em sequência, mostrando o andamento, e permite parar depois da atual. Também mostra o histórico.
   - Clicar numa busca do histórico abre um modal (`SearchLeadsDialog`) com as empresas que ela trouxe: nota, situação do site, status e página, com o selo "Nova" nas que entraram na lista por ela. Clicar numa empresa abre o painel de detalhes dela.
+  - A lixeira na linha apaga a busca, com confirmação. Ela só aparece nas buscas `deletable`.
 - **Leads (`/leads`):**
   - Filtros em chips (situação do site, status e funcionamento) e campos para nome, cidade, categoria, bairro, nota mínima, mínimo de avaliações e ordenação.
   - Por padrão, nenhum chip vem marcado e a lista mostra todas as empresas. Cada chip marcado restringe a lista; os filtros só escondem da tela, e os dados continuam no banco.

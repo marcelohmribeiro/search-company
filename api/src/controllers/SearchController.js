@@ -1,4 +1,4 @@
-import { runSearch, listSearches, listSearchLeads } from "#src/services";
+import { runSearch, listSearches, listSearchLeads, deleteSearch } from "#src/services";
 import { searchInputSchema, googleApiKeySchema, searchIdSchema } from "#src/schemas";
 
 const SearchController = () => {
@@ -34,10 +34,21 @@ const SearchController = () => {
     }
   }
 
+  async function remove(req, res, next) {
+    try {
+      await deleteSearch(req.user.id, searchIdSchema.parse(req.params.id));
+
+      return res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   return {
     create,
     findAll,
     leads,
+    remove,
   };
 };
 
