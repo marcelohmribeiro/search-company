@@ -3,6 +3,8 @@ import { ArrowLeft, CircleAlert, FileText, ListChecks, MessageSquareText, Plus }
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
+import InstagramIcon from 'src/components/icons/InstagramIcon'
+import LeadStatusSelect from 'src/components/leads/LeadStatusSelect'
 import PitchBlockCard from 'src/components/pitch/PitchBlockCard'
 import PitchHeaderCard from 'src/components/pitch/PitchHeaderCard'
 import SellerNameDialog from 'src/components/pitch/SellerNameDialog'
@@ -32,10 +34,11 @@ import {
 	savePitch,
 	setPitchItemDone,
 	setPitchMessageSent,
+	updateLead,
 	updateMe,
 } from 'src/services'
 import { useAuthStore } from 'src/store/authStore'
-import type { Pitch, PitchBlock, PitchChecklistBlock, PitchHeader, PitchMessageBlock } from 'src/types'
+import type { LeadStatus, Pitch, PitchBlock, PitchChecklistBlock, PitchHeader, PitchMessageBlock } from 'src/types'
 
 const EMPTY_HEADER: PitchHeader = { demoUrl: null, decisionMaker: null, contactWhatsapp: null, contactNotes: null }
 
@@ -83,6 +86,15 @@ export default function LeadPitchPage() {
 		[setPitch],
 	)
 
+	async function changeStatus(status: LeadStatus) {
+		try {
+			const updated = await updateLead(id, { status })
+			lead.setData((current) => current && { ...current, status: updated.status })
+		} catch (error) {
+			toast.error('Não foi possível alterar o status', { description: getErrorMessage(error) })
+		}
+	}
+
 	const save = (header: PitchHeader, blocks: PitchBlock[]) =>
 		run(() => savePitch(id, { ...header, blocks }), 'Não foi possível salvar o plano')
 
@@ -108,19 +120,34 @@ export default function LeadPitchPage() {
 
 	const company = lead.data
 	const whatsapp = contactWhatsappUrl(pitch?.contactWhatsapp ?? null, company)
+	const instagram = company.siteStatus === 'INSTAGRAM_ONLY' ? company.websiteUri : null
 	const back = (
-		<Button variant='outline' asChild>
-			<Link to='/leads'>
-				<ArrowLeft />
-				Leads
-			</Link>
-		</Button>
+		<div className='flex flex-wrap items-center justify-between gap-2'>
+			<Button variant='outline' asChild>
+				<Link to='/leads'>
+					<ArrowLeft />
+					Leads
+				</Link>
+			</Button>
+			<div className='flex flex-wrap items-center gap-2'>
+				<LeadStatusSelect value={company.status} onChange={changeStatus} className='w-40' />
+				{instagram && (
+					<Button variant='outline' asChild>
+						<a href={instagram} target='_blank' rel='noreferrer'>
+							<InstagramIcon className='text-pink-600 dark:text-pink-400' />
+							Instagram
+						</a>
+					</Button>
+				)}
+			</div>
+		</div>
 	)
 
 	if (!pitch) {
 		return (
 			<div className='space-y-6'>
-				<PageHeader title={company.name} description='Plano de venda do site' actions={back} />
+				<PageHeader title={company.name} description='Plano de venda do site' />
+				{back}
 				<Card>
 					<Empty>
 						<EmptyHeader>
@@ -212,8 +239,8 @@ export default function LeadPitchPage() {
 						? `Plano de venda · próximo follow-up em ${formatDate(pitch.nextFollowUpAt)}`
 						: 'Plano de venda do site'
 				}
-				actions={back}
 			/>
+			{back}
 
 			<PitchHeaderCard
 				header={header}
