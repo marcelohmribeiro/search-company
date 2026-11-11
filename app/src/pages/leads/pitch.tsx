@@ -38,6 +38,7 @@ import {
 	updateMe,
 } from 'src/services'
 import { useAuthStore } from 'src/store/authStore'
+import { useLeadsViewStore } from 'src/store/leadsViewStore'
 import type { LeadStatus, Pitch, PitchBlock, PitchChecklistBlock, PitchHeader, PitchMessageBlock } from 'src/types'
 
 const EMPTY_HEADER: PitchHeader = { demoUrl: null, decisionMaker: null, contactWhatsapp: null, contactNotes: null }
@@ -64,6 +65,7 @@ export default function LeadPitchPage() {
 	const pitch = pitchState.data
 	const setPitch = pitchState.setData
 	const { user, setUser } = useAuthStore()
+	const leadsSearch = useLeadsViewStore((state) => state.search)
 
 	const [busy, setBusy] = useState(false)
 	const [confirmDelete, setConfirmDelete] = useState(false)
@@ -124,7 +126,7 @@ export default function LeadPitchPage() {
 	const back = (
 		<div className='flex flex-wrap items-center justify-between gap-2'>
 			<Button variant='outline' asChild>
-				<Link to='/leads'>
+				<Link to={`/leads${leadsSearch}`}>
 					<ArrowLeft />
 					Leads
 				</Link>
