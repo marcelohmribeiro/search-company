@@ -45,3 +45,21 @@ export function dropPosition(cards: ProjectCard[], movingId: number, beforeId: n
 	if (next === undefined) return prev + 1
 	return (prev + next) / 2
 }
+
+/** Tamanho máximo do original escolhido ou colado; ele é reduzido no navegador antes do envio. */
+export const IMAGE_SOURCE_MAX_BYTES = 25 * 1024 * 1024
+const IMAGE_MAX_SIDE = 1600
+
+/** Reduz para no máximo 1600px e converte para WebP no navegador, para o envio ser leve e rápido. */
+export async function compressImage(file: File): Promise<File> {
+	const bitmap = await createImageBitmap(file)
+	const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+	const canvas = document.createElement('canvas')
+	canvas.width = Math.round(bitmap.width * scale)
+	canvas.height = Math.round(bitmap.height * scale)
+	canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+	bitmap.close()
+	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.82))
+	if (!blob || blob.type !== 'image/webp' || blob.size >= file.size) return file
+	return new File([blob], 'image.webp', { type: 'image/webp' })
+}

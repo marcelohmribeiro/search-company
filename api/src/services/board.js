@@ -67,7 +67,10 @@ async function setCardImage(userId, id, buffer) {
 	const card = await findCard(userId, id);
 	let webp;
 	try {
-		webp = await sharp(buffer).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+		const meta = await sharp(buffer).metadata();
+		// O app já envia WebP reduzido; só recomprime o que chega grande ou em outro formato.
+		const ready = meta.format === "webp" && Math.max(meta.width, meta.height) <= 1600 && buffer.length <= 1_500_000;
+		webp = ready ? buffer : await sharp(buffer).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
 	} catch {
 		throw httpError(400, "Imagem inválida.");
 	}

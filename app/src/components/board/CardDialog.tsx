@@ -19,7 +19,7 @@ import { Input } from 'src/components/ui/input'
 import { Label } from 'src/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
 import { Textarea } from 'src/components/ui/textarea'
-import { BOARD_COLUMNS, IMAGE_MAX_BYTES, IMAGE_TYPES, cardImageSrc } from 'src/lib/board'
+import { BOARD_COLUMNS, IMAGE_MAX_BYTES, IMAGE_SOURCE_MAX_BYTES, IMAGE_TYPES, cardImageSrc, compressImage } from 'src/lib/board'
 import { createCard, deleteCard, deleteCardImage, getErrorMessage, updateCard, uploadCardImage } from 'src/services'
 import type { BoardColumn, BoardProject, ProjectCard } from 'src/types'
 
@@ -70,13 +70,28 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 	const project = projects.find((item) => item.leadId === leadId)
 	const imageSrc = preview ?? (!removeImage && card?.imageUrl ? cardImageSrc(card.imageUrl) : null)
 
-	function pickFile(picked: File | undefined) {
+	async function pickFile(picked: File | undefined) {
 		if (!picked) return
 		if (!IMAGE_TYPES.includes(picked.type)) return toast.error('Use uma imagem JPG, PNG ou WebP.')
-		if (picked.size > IMAGE_MAX_BYTES) return toast.error('A imagem passa de 5 MB.')
-		setFile(picked)
+		if (picked.size > IMAGE_SOURCE_MAX_BYTES) return toast.error('A imagem passa de 25 MB.')
+		const compressed = await compressImage(picked).catch(() => picked)
+		if (compressed.size > IMAGE_MAX_BYTES) return toast.error('A imagem passa de 5 MB mesmo comprimida.')
+		setFile(compressed)
 		setRemoveImage(false)
 	}
+
+	// Colar (Ctrl/Cmd+V) uma imagem em qualquer lugar do modal vira a capa. Texto colado segue normal.
+	useEffect(() => {
+		if (!target) return
+		function onPaste(event: ClipboardEvent) {
+			const image = [...(event.clipboardData?.files ?? [])].find((item) => item.type.startsWith('image/'))
+			if (!image) return
+			event.preventDefault()
+			pickFile(image)
+		}
+		window.addEventListener('paste', onPaste)
+		return () => window.removeEventListener('paste', onPaste)
+	})
 
 	async function save() {
 		if (!title.trim() || !leadId) return
@@ -220,8 +235,8 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 									className='flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed p-6 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-foreground'
 								>
 									<ImagePlus className='size-5' />
-									Escolher ou soltar imagem
-									<span className='text-xs'>JPG, PNG ou WebP, até 5 MB</span>
+									Escolher, soltar ou colar (Ctrl/⌘+V)
+									<span className='text-xs'>JPG, PNG ou WebP; reduzida antes do envio</span>
 								</button>
 							)}
 							<input
