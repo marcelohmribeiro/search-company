@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
 import BoardCard from 'src/components/board/BoardCard'
 import CardDialog from 'src/components/board/CardDialog'
+import CardSheet from 'src/components/board/CardSheet'
 import type { CardDialogTarget } from 'src/components/board/CardDialog'
 import ProjectTag from 'src/components/board/ProjectTag'
 import { Alert, AlertDescription } from 'src/components/ui/alert'
@@ -35,11 +36,14 @@ export default function ProjectsPage() {
 	const board = useApi(fetchBoard)
 	const [params, setParams] = useSearchParams()
 	const [dialog, setDialog] = useState<CardDialogTarget | null>(null)
+	const [viewingId, setViewingId] = useState<number | null>(null)
 	const [draggingId, setDraggingId] = useState<number | null>(null)
 	const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
 
 	const projects = useMemo(() => board.data?.projects ?? [], [board.data])
 	const cards = useMemo(() => board.data?.cards ?? [], [board.data])
+	// Lido do quadro, para o painel refletir a edição salva no modal.
+	const viewing = cards.find((card) => card.id === viewingId) ?? null
 	const names = useMemo(() => new Map(projects.map((project) => [project.leadId, project.name])), [projects])
 
 	const selectedProjects = params.getAll('projeto').filter((id) => names.has(id) || !board.data)
@@ -245,7 +249,7 @@ export default function ProjectsPage() {
 											wide={wideCards}
 											dragging={draggingId === card.id}
 											dropBefore={isTarget && dropTarget?.beforeId === card.id && draggingId !== card.id}
-											onOpen={() => setDialog({ card })}
+											onOpen={() => setViewingId(card.id)}
 											onDragStart={(event) => {
 												event.dataTransfer.effectAllowed = 'move'
 												setDraggingId(card.id)
@@ -266,6 +270,13 @@ export default function ProjectsPage() {
 					</div>
 				)
 			)}
+
+			<CardSheet
+				card={viewing}
+				projectName={viewing ? (names.get(viewing.leadId) ?? '') : ''}
+				onClose={() => setViewingId(null)}
+				onEdit={(card) => setDialog({ card })}
+			/>
 
 			<CardDialog
 				target={dialog}

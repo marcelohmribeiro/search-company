@@ -35,7 +35,10 @@ interface CardDialogProps {
 }
 
 export default function CardDialog({ target, projects, onClose, onSaved, onDeleted }: CardDialogProps) {
-	const card = target && 'card' in target ? target.card : null
+	// Mantém o último alvo durante a animação de fechar, para o título não piscar "Novo card".
+	const [shown, setShown] = useState(target)
+	if (target && target !== shown) setShown(target)
+	const card = shown && 'card' in shown ? shown.card : null
 	const [title, setTitle] = useState('')
 	const [description, setDescription] = useState('')
 	const [leadId, setLeadId] = useState('')
