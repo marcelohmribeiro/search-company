@@ -18,20 +18,34 @@ const ORDER_BY = {
 	recent: [{ firstSeenAt: "desc" }, { leadId: "asc" }],
 };
 
+const ACCENTED = "ÁÀÂÃÄáàâãäÉÈÊËéèêëÍÌÎÏíìîïÓÒÔÕÖóòôõöÚÙÛÜúùûüÇçÑñ";
+const PLAIN = "AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn";
+
+const stripAccents = (text) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+/** IDs dos leads do usuário cujo nome contém `q`, sem diferenciar maiúsculas nem acentos. */
+async function findLeadIdsByName(userId, q) {
+	const pattern = `%${stripAccents(q).replace(/[\\%_]/g, "\\$&")}%`;
+	const rows = await prisma.$queryRaw`
+		select ul."leadId" from "UserLead" ul join "Lead" l on l.id = ul."leadId"
+		where ul."userId" = ${userId} and translate(l.name, ${ACCENTED}, ${PLAIN}) ilike ${pattern}`;
+	return rows.map((row) => row.leadId);
+}
+
 /** Junta os dados do `Lead` com o acompanhamento do usuário (`UserLead`). */
 function toUserLead({ lead, userId, leadId, firstSearchId, pitch = null, ...tracking }) {
 	return { ...lead, ...tracking, pitch };
 }
 
-function buildWhere(userId, filters) {
+async function buildWhere(userId, filters) {
 	const lead = {};
 	if (filters.siteStatus?.length) lead.siteStatus = { in: filters.siteStatus };
 	if (filters.businessStatus?.length) lead.businessStatus = { in: filters.businessStatus };
 	if (filters.minRating != null) lead.rating = { gte: filters.minRating };
 	if (filters.minReviews != null) lead.userRatingCount = { gte: filters.minReviews };
-	if (filters.q) lead.name = { contains: filters.q, mode: "insensitive" };
 
 	const where = { userId, lead };
+	if (filters.q) where.leadId = { in: await findLeadIdsByName(userId, filters.q) };
 	if (filters.status?.length) where.status = { in: filters.status };
 	if (filters.pitch === "has") where.pitch = { isNot: null };
 	if (filters.pitch === "none") where.pitch = { is: null };
@@ -49,7 +63,7 @@ function buildWhere(userId, filters) {
 
 /** Página de leads do usuário com filtros: `{ items, total, page, pageSize }`. */
 async function listLeads(userId, filters, { page, pageSize, orderBy }) {
-	const where = buildWhere(userId, filters);
+	const where = await buildWhere(userId, filters);
 	const [rows, total] = await prisma.$transaction([
 		prisma.userLead.findMany({
 			where,
