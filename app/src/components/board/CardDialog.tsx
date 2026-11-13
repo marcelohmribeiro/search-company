@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ImagePlus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import ProjectTag from 'src/components/board/ProjectTag'
+import ProposalsEditor from 'src/components/board/ProposalsEditor'
+import type { ProposalDraft } from 'src/components/board/ProposalsEditor'
 import PitchMarkdown from 'src/components/pitch/PitchMarkdown'
 import {
 	AlertDialog,
@@ -19,8 +21,18 @@ import { Input } from 'src/components/ui/input'
 import { Label } from 'src/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from 'src/components/ui/select'
 import { Textarea } from 'src/components/ui/textarea'
-import { BOARD_COLUMNS, IMAGE_MAX_BYTES, IMAGE_SOURCE_MAX_BYTES, IMAGE_TYPES, cardImageSrc, compressImage } from 'src/lib/board'
-import { createCard, deleteCard, deleteCardImage, getErrorMessage, updateCard, uploadCardImage } from 'src/services'
+import { BOARD_COLUMNS, IMAGE_MAX_BYTES, IMAGE_SOURCE_MAX_BYTES, IMAGE_TYPES, MAX_PROPOSALS, cardImageSrc, compressImage } from 'src/lib/board'
+import {
+	addProposal,
+	createCard,
+	deleteCard,
+	deleteCardImage,
+	deleteProposal,
+	getErrorMessage,
+	updateCard,
+	updateProposal,
+	uploadCardImage,
+} from 'src/services'
 import type { BoardColumn, BoardProject, ProjectCard } from 'src/types'
 
 /** `card` edita um card existente; `draft` cria um novo na coluna dada. */
@@ -47,6 +59,10 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 	const [preview, setPreview] = useState<string | null>(null)
 	const [removeImage, setRemoveImage] = useState(false)
 	const [previewMarkdown, setPreviewMarkdown] = useState(false)
+	const [proposals, setProposals] = useState<ProposalDraft[]>([])
+	const [removedProposals, setRemovedProposals] = useState<number[]>([])
+	/** Para onde vai uma imagem colada: a última área clicada, ou a capa enquanto ela estiver vazia. */
+	const [pasteZone, setPasteZone] = useState<'cover' | 'proposals' | null>(null)
 	const [busy, setBusy] = useState(false)
 	const [confirmDelete, setConfirmDelete] = useState(false)
 	const fileInput = useRef<HTMLInputElement>(null)
@@ -62,6 +78,16 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 		setFile(null)
 		setRemoveImage(false)
 		setPreviewMarkdown(Boolean(card?.description))
+		setProposals(
+			(card?.proposals ?? []).map((proposal) => ({
+				key: `saved-${proposal.id}`,
+				id: proposal.id,
+				src: cardImageSrc(proposal.url),
+				caption: proposal.caption ?? '',
+			})),
+		)
+		setRemovedProposals([])
+		setPasteZone(null)
 	}, [target, card])
 
 	useEffect(() => {
@@ -74,24 +100,71 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 	const project = projects.find((item) => item.leadId === leadId)
 	const imageSrc = preview ?? (!removeImage && card?.imageUrl ? cardImageSrc(card.imageUrl) : null)
 
+	/** Valida e comprime no navegador; `null` (com aviso) se a imagem não serve. */
+	async function prepareImage(picked: File) {
+		if (!IMAGE_TYPES.includes(picked.type)) return toast.error('Use uma imagem JPG, PNG ou WebP.'), null
+		if (picked.size > IMAGE_SOURCE_MAX_BYTES) return toast.error('A imagem passa de 25 MB.'), null
+		const compressed = await compressImage(picked).catch(() => picked)
+		if (compressed.size > IMAGE_MAX_BYTES) return toast.error('A imagem passa de 5 MB mesmo comprimida.'), null
+		return compressed
+	}
+
 	async function pickFile(picked: File | undefined) {
 		if (!picked) return
-		if (!IMAGE_TYPES.includes(picked.type)) return toast.error('Use uma imagem JPG, PNG ou WebP.')
-		if (picked.size > IMAGE_SOURCE_MAX_BYTES) return toast.error('A imagem passa de 25 MB.')
-		const compressed = await compressImage(picked).catch(() => picked)
-		if (compressed.size > IMAGE_MAX_BYTES) return toast.error('A imagem passa de 5 MB mesmo comprimida.')
+		const compressed = await prepareImage(picked)
+		if (!compressed) return
 		setFile(compressed)
 		setRemoveImage(false)
 	}
 
-	// Colar (Ctrl/Cmd+V) uma imagem em qualquer lugar do modal vira a capa. Texto colado segue normal.
+	async function addProposalFiles(files: File[]) {
+		const room = MAX_PROPOSALS - proposals.length
+		if (files.length > room) toast.error(`Cada card aceita até ${MAX_PROPOSALS} propostas.`)
+		const prepared = (await Promise.all(files.slice(0, Math.max(room, 0)).map(prepareImage))).filter((item): item is File => Boolean(item))
+		setProposals((current) => [
+			...current,
+			...prepared.map((item) => ({ key: crypto.randomUUID(), file: item, src: URL.createObjectURL(item), caption: '' })),
+		])
+	}
+
+	function removeProposal(item: ProposalDraft) {
+		if (item.id) setRemovedProposals((current) => [...current, item.id!])
+		if (item.file) URL.revokeObjectURL(item.src)
+		setProposals((current) => current.filter((other) => other.key !== item.key))
+	}
+
+	/** Envia as mudanças das propostas: remoções, novas e depois ordem e legendas. */
+	async function saveProposals(saved: ProjectCard) {
+		for (const id of removedProposals) saved = await deleteProposal(saved.id, id)
+		const ids = new Map<string, number>()
+		for (const item of proposals) {
+			if (!item.file) continue
+			const before = new Set(saved.proposals.map((proposal) => proposal.id))
+			saved = await addProposal(saved.id, item.file, item.caption.trim() || null)
+			const created = saved.proposals.find((proposal) => !before.has(proposal.id))
+			if (created) ids.set(item.key, created.id)
+		}
+		for (const [index, item] of proposals.entries()) {
+			const id = item.id ?? ids.get(item.key)
+			const current = saved.proposals.find((proposal) => proposal.id === id)
+			if (!id || !current) continue
+			const caption = item.caption.trim() || null
+			if (current.position !== index + 1 || current.caption !== caption) {
+				saved = await updateProposal(saved.id, id, { position: index + 1, caption })
+			}
+		}
+		return saved
+	}
+
+	// Colar (Ctrl/Cmd+V) uma imagem no modal vai para a capa ou para as propostas (ver `pasteZone`). Texto colado segue normal.
 	useEffect(() => {
 		if (!target) return
 		function onPaste(event: ClipboardEvent) {
-			const image = [...(event.clipboardData?.files ?? [])].find((item) => item.type.startsWith('image/'))
-			if (!image) return
+			const images = [...(event.clipboardData?.files ?? [])].filter((item) => item.type.startsWith('image/'))
+			if (!images.length) return
 			event.preventDefault()
-			pickFile(image)
+			if ((pasteZone ?? (imageSrc ? 'proposals' : 'cover')) === 'proposals') addProposalFiles(images)
+			else pickFile(images[0])
 		}
 		window.addEventListener('paste', onPaste)
 		return () => window.removeEventListener('paste', onPaste)
@@ -106,6 +179,7 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 			let saved = card ? await updateCard(card.id, { ...text, column }) : await createCard({ ...text, leadId, column })
 			if (file) saved = await uploadCardImage(saved.id, file)
 			else if (removeImage && card?.imageUrl) saved = await deleteCardImage(saved.id)
+			saved = await saveProposals(saved)
 			onSaved(saved)
 			if (keepOpen && !card) {
 				setTitle('')
@@ -113,6 +187,8 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 				setFile(null)
 				setRemoveImage(false)
 				setPreviewMarkdown(false)
+				setProposals([])
+				setPasteZone(null)
 				toast.success(`“${saved.title}” adicionado.`)
 				titleInput.current?.focus()
 			} else onClose()
@@ -141,7 +217,7 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 	return (
 		<>
 			<Dialog open={Boolean(target)} onOpenChange={(open) => !open && !busy && onClose()}>
-				<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-xl'>
+				<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
 					<DialogHeader>
 						<DialogTitle>{card ? 'Editar card' : 'Novo card'}</DialogTitle>
 						<DialogDescription>{project ? <ProjectTag leadId={project.leadId} name={project.name} /> : 'Escolha o projeto.'}</DialogDescription>
@@ -223,8 +299,8 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 							)}
 						</div>
 
-						<div className='space-y-2'>
-							<Label>Imagem de capa</Label>
+						<div className='space-y-2' onPointerDown={() => setPasteZone('cover')}>
+							<Label>Atual (capa)</Label>
 							{imageSrc ? (
 								<div className='relative overflow-hidden rounded-lg border'>
 									<img src={imageSrc} alt='' className='aspect-video w-full object-cover' />
@@ -269,6 +345,14 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 								}}
 							/>
 						</div>
+
+						<ProposalsEditor
+							items={proposals}
+							onChange={setProposals}
+							onAddFiles={addProposalFiles}
+							onRemove={removeProposal}
+							onFocusZone={() => setPasteZone('proposals')}
+						/>
 					</form>
 
 					<DialogFooter className='sm:justify-between'>
@@ -298,7 +382,7 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Excluir este card?</AlertDialogTitle>
-						<AlertDialogDescription>“{card?.title}” e a imagem dele serão apagados. Não dá para desfazer.</AlertDialogDescription>
+						<AlertDialogDescription>“{card?.title}” e as imagens dele serão apagados. Não dá para desfazer.</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>

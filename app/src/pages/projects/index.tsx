@@ -28,7 +28,13 @@ import { cn } from 'src/lib/utils'
 import { fetchBoard, getErrorMessage, updateCard } from 'src/services'
 import type { BoardColumn, ProjectCard } from 'src/types'
 
-const GRID_COLUMNS: Record<number, string> = { 1: '', 2: 'md:grid-cols-2', 3: 'md:grid-cols-2 xl:grid-cols-3', 4: 'md:grid-cols-2 xl:grid-cols-4' }
+const GRID_COLUMNS: Record<number, string> = {
+	1: '',
+	2: 'md:grid-cols-2',
+	3: 'md:grid-cols-2 xl:grid-cols-3',
+	4: 'md:grid-cols-2 xl:grid-cols-4',
+	5: 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5',
+}
 
 type DropTarget = { column: BoardColumn; beforeId: number | null }
 

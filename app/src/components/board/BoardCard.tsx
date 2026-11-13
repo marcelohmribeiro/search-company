@@ -1,5 +1,5 @@
 import type { DragEvent } from 'react'
-import { AlignLeft } from 'lucide-react'
+import { AlignLeft, Images } from 'lucide-react'
 import ProjectTag from 'src/components/board/ProjectTag'
 import PitchMarkdown from 'src/components/pitch/PitchMarkdown'
 import { cardImageSrc } from 'src/lib/board'
@@ -59,7 +59,15 @@ export default function BoardCard({ card, projectName, dragging, dropBefore, wid
 					/>
 				)}
 				<div className={cn('space-y-2 p-3', wide && 'min-w-0 flex-1 sm:p-4')}>
-					<ProjectTag leadId={card.leadId} name={projectName} />
+					<div className='flex items-center justify-between gap-2'>
+						<ProjectTag leadId={card.leadId} name={projectName} />
+						{card.proposals.length > 0 && (
+							<span className='flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums' title='Propostas'>
+								<Images className='size-3' />
+								{card.proposals.length}
+							</span>
+						)}
+					</div>
 					<p className={cn('leading-snug font-medium', wide ? 'text-base' : 'text-sm')}>{card.title}</p>
 					{card.description &&
 						(wide ? (

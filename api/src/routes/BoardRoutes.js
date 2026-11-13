@@ -12,6 +12,9 @@ BoardRouter.patch("/cards/:id", verifyJWT, board.update);
 BoardRouter.delete("/cards/:id", verifyJWT, board.remove);
 BoardRouter.put("/cards/:id/image", verifyJWT, image, board.uploadImage);
 BoardRouter.delete("/cards/:id/image", verifyJWT, board.removeImage);
+BoardRouter.post("/cards/:id/proposals", verifyJWT, image, board.addProposal);
+BoardRouter.patch("/cards/:id/proposals/:proposalId", verifyJWT, board.updateProposal);
+BoardRouter.delete("/cards/:id/proposals/:proposalId", verifyJWT, board.removeProposal);
 
 export { BoardRouter };
 export default BoardRouter;

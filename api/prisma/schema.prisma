@@ -257,6 +257,7 @@ model LeadPitch {
 /// Coluna do quadro de projetos.
 enum BoardColumn {
   BACKLOG
+  PROPOSAL
   TODO
   REVIEW
   DONE
@@ -278,6 +279,20 @@ model ProjectCard {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   userLead    UserLead    @relation(fields: [userId, leadId], references: [userId, leadId], onDelete: Cascade)
+  proposals   CardProposal[]
 
   @@index([userId, column, position])
+}
+
+/// Imagem de proposta de um card: como a capa ("atual") deve ficar. Até 10 por card, em ordem.
+model CardProposal {
+  id        Int         @id @default(autoincrement())
+  cardId    Int
+  url       String
+  caption   String?
+  position  Float
+  createdAt DateTime    @default(now())
+  card      ProjectCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, position])
 }

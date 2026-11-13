@@ -1,9 +1,17 @@
-export type BoardColumn = 'BACKLOG' | 'TODO' | 'REVIEW' | 'DONE'
+export type BoardColumn = 'BACKLOG' | 'PROPOSAL' | 'TODO' | 'REVIEW' | 'DONE'
 
 /** Lead `CLOSED` da lista do usuário. */
 export interface BoardProject {
 	leadId: string
 	name: string
+}
+
+/** Imagem de como a capa ("atual") deve ficar. */
+export interface CardProposal {
+	id: number
+	url: string
+	caption: string | null
+	position: number
 }
 
 export interface ProjectCard {
@@ -14,6 +22,7 @@ export interface ProjectCard {
 	title: string
 	description: string | null
 	imageUrl: string | null
+	proposals: CardProposal[]
 	createdAt: string
 	updatedAt: string
 }

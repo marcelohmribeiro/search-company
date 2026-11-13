@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "BoardColumn" ADD VALUE 'PROPOSAL' BEFORE 'TODO';

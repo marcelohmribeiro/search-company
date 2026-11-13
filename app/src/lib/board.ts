@@ -3,6 +3,7 @@ import type { BoardColumn, ProjectCard } from 'src/types'
 
 export const BOARD_COLUMNS: { value: BoardColumn; label: string; dotClassName: string }[] = [
 	{ value: 'BACKLOG', label: 'Backlog', dotClassName: 'bg-zinc-400' },
+	{ value: 'PROPOSAL', label: 'Proposta', dotClassName: 'bg-fuchsia-500' },
 	{ value: 'TODO', label: 'Fazer', dotClassName: 'bg-indigo-500' },
 	{ value: 'REVIEW', label: 'Revisão', dotClassName: 'bg-amber-500' },
 	{ value: 'DONE', label: 'Concluído', dotClassName: 'bg-emerald-500' },
@@ -63,3 +64,4 @@ export async function compressImage(file: File): Promise<File> {
 	if (!blob || blob.type !== 'image/webp' || blob.size >= file.size) return file
 	return new File([blob], 'image.webp', { type: 'image/webp' })
 }
+export const MAX_PROPOSALS = 10
