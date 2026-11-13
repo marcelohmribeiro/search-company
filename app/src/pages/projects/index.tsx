@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { DragEvent } from 'react'
-import { ChevronDown, FolderKanban, Plus } from 'lucide-react'
+import { ChevronDown, FolderKanban, LayoutGrid, Plus, Rows3 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import PageHeader from 'src/components/PageHeader'
@@ -46,8 +46,18 @@ export default function ProjectsPage() {
 	const selectedColumns = params.getAll('coluna') as BoardColumn[]
 	const visibleColumns = selectedColumns.length ? BOARD_COLUMNS.filter((column) => selectedColumns.includes(column.value)) : BOARD_COLUMNS
 
+	// Com até 2 colunas visíveis, os cards podem ficar em lista (horizontais com 1 coluna) ou em grade.
+	const fewColumns = visibleColumns.length <= 2
+	const gridView = fewColumns && params.get('visao') === 'grade'
+	const wideCards = visibleColumns.length === 1 && !gridView
+	const cardsLayout = !gridView
+		? 'flex flex-col gap-3'
+		: visibleColumns.length === 1
+			? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+			: 'grid gap-3 lg:grid-cols-2'
+
 	const setFilter = useCallback(
-		(key: 'projeto' | 'coluna', values: string[]) =>
+		(key: 'projeto' | 'coluna' | 'visao', values: string[]) =>
 			setParams(
 				(current) => {
 					const next = new URLSearchParams(current)
@@ -149,6 +159,22 @@ export default function ProjectsPage() {
 								)}
 							</DropdownMenuContent>
 						</DropdownMenu>
+						{fewColumns && (
+							<ToggleGroup
+								type='single'
+								variant='outline'
+								size='sm'
+								value={gridView ? 'grade' : 'lista'}
+								onValueChange={(value) => value && setFilter('visao', value === 'grade' ? ['grade'] : [])}
+							>
+								<ToggleGroupItem value='lista' aria-label='Ver em lista' className='px-2.5'>
+									<Rows3 />
+								</ToggleGroupItem>
+								<ToggleGroupItem value='grade' aria-label='Ver em grade' className='px-2.5'>
+									<LayoutGrid />
+								</ToggleGroupItem>
+							</ToggleGroup>
+						)}
 						<ToggleGroup type='multiple' variant='outline' size='sm' value={selectedColumns} onValueChange={(values) => setFilter('coluna', values)}>
 							{BOARD_COLUMNS.map((column) => (
 								<ToggleGroupItem key={column.value} value={column.value} className='px-3'>
@@ -210,11 +236,13 @@ export default function ProjectsPage() {
 											<Plus />
 										</Button>
 									</header>
-									{list.map((card) => (
+									<div className={cardsLayout}>
+										{list.map((card) => (
 										<BoardCard
 											key={card.id}
 											card={card}
 											projectName={names.get(card.leadId) ?? ''}
+											wide={wideCards}
 											dragging={draggingId === card.id}
 											dropBefore={isTarget && dropTarget?.beforeId === card.id && draggingId !== card.id}
 											onOpen={() => setDialog({ card })}
@@ -229,6 +257,7 @@ export default function ProjectsPage() {
 											onDragOver={(event) => onDragOverCard(event, column.value, card)}
 										/>
 									))}
+									</div>
 									{isTarget && dropTarget?.beforeId === null && <div className='h-0.5 rounded-full bg-primary' />}
 									<div className='flex-1' onDragOver={(event) => onDragOverColumn(event, column.value)} />
 								</section>
