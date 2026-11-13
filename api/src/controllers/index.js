@@ -6,3 +6,4 @@ export * from "./MeController.js";
 export * from "./AdminController.js";
 export * from "./ApiTokenController.js";
 export * from "./PitchController.js";
+export * from "./BoardController.js";

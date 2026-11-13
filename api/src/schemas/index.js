@@ -8,3 +8,4 @@ export * from "./authSchema.js";
 export * from "./adminSchema.js";
 export * from "./apiTokenSchema.js";
 export * from "./pitchSchema.js";
+export * from "./boardSchema.js";

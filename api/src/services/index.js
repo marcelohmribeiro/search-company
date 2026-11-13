@@ -8,3 +8,4 @@ export * from "./users.js";
 export * from "./admin.js";
 export * from "./apiTokens.js";
 export * from "./pitches.js";
+export * from "./board.js";

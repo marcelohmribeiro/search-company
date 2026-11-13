@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Ellipsis, Images, MessageCircle, MessageSquareText, SearchX, StickyNote } from 'lucide-react'
+import { ChevronLeft, FolderKanban, ChevronRight, Ellipsis, Images, MessageCircle, MessageSquareText, SearchX, StickyNote } from 'lucide-react'
 import { Link } from 'react-router'
 import InstagramIcon from 'src/components/icons/InstagramIcon'
 import LeadRating from 'src/components/leads/LeadRating'
@@ -203,6 +203,18 @@ function LeadsTable({
 															</Button>
 														</TooltipTrigger>
 														<TooltipContent>Abrir plano de venda</TooltipContent>
+													</Tooltip>
+												)}
+												{lead.status === 'CLOSED' && (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<Button variant='ghost' size='icon-sm' asChild>
+																<Link to={`/projetos?projeto=${encodeURIComponent(lead.id)}`} aria-label='Abrir quadro do projeto'>
+																	<FolderKanban className='text-emerald-600 dark:text-emerald-400' />
+																</Link>
+															</Button>
+														</TooltipTrigger>
+														<TooltipContent>Abrir quadro do projeto</TooltipContent>
 													</Tooltip>
 												)}
 												{whatsapp && (

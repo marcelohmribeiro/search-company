@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { KeyRound, LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
+import { FolderKanban, KeyRound, LogOut, MapPinned, Search, ShieldCheck, Users } from 'lucide-react'
 import ThemeToggle from 'src/components/ThemeToggle'
 import UsageMeter from 'src/components/UsageMeter'
 import { Button } from 'src/components/ui/button'
@@ -14,6 +14,7 @@ import { useLeadsViewStore } from 'src/store/leadsViewStore'
 const NAV_ITEMS = [
 	{ to: '/', label: 'Buscar', icon: Search, end: true },
 	{ to: '/leads', label: 'Leads', icon: Users, end: false },
+	{ to: '/projetos', label: 'Projetos', icon: FolderKanban, end: false },
 	{ to: '/tokens', label: 'Tokens', icon: KeyRound, end: false },
 ]
 

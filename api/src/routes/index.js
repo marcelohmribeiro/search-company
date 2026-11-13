@@ -4,3 +4,4 @@ export * from "./LeadRoutes.js";
 export * from "./AuthRoutes.js";
 export * from "./MeRoutes.js";
 export * from "./AdminRoutes.js";
+export * from "./BoardRoutes.js";
