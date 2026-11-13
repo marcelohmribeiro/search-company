@@ -63,7 +63,7 @@ export default function BoardCard({ card, projectName, dragging, dropBefore, wid
 					<p className={cn('leading-snug font-medium', wide ? 'text-base' : 'text-sm')}>{card.title}</p>
 					{card.description &&
 						(wide ? (
-							<div className='relative max-h-48 overflow-hidden [mask-image:linear-gradient(to_bottom,black_75%,transparent)] text-muted-foreground'>
+							<div className='text-muted-foreground'>
 								<PitchMarkdown className='[&_a]:pointer-events-none'>{card.description}</PitchMarkdown>
 							</div>
 						) : (
