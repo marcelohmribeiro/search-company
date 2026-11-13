@@ -47,6 +47,7 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 	const [busy, setBusy] = useState(false)
 	const [confirmDelete, setConfirmDelete] = useState(false)
 	const fileInput = useRef<HTMLInputElement>(null)
+	const titleInput = useRef<HTMLInputElement>(null)
 
 	useEffect(() => {
 		if (!target) return
@@ -93,7 +94,8 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 		return () => window.removeEventListener('paste', onPaste)
 	})
 
-	async function save() {
+	/** `keepOpen` (Ctrl/Cmd+Enter num card novo) salva e limpa o formulário para o próximo, no mesmo projeto e coluna. */
+	async function save(keepOpen = false) {
 		if (!title.trim() || !leadId) return
 		setBusy(true)
 		try {
@@ -102,7 +104,15 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 			if (file) saved = await uploadCardImage(saved.id, file)
 			else if (removeImage && card?.imageUrl) saved = await deleteCardImage(saved.id)
 			onSaved(saved)
-			onClose()
+			if (keepOpen && !card) {
+				setTitle('')
+				setDescription('')
+				setFile(null)
+				setRemoveImage(false)
+				setPreviewMarkdown(false)
+				toast.success(`“${saved.title}” adicionado.`)
+				titleInput.current?.focus()
+			} else onClose()
 		} catch (error) {
 			toast.error('Não foi possível salvar o card.', { description: getErrorMessage(error) })
 		} finally {
@@ -135,6 +145,12 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 					</DialogHeader>
 
 					<form
+						onKeyDown={(event) => {
+							if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+								event.preventDefault()
+								if (!busy) save(true)
+							}
+						}}
 						id='card-form'
 						className='space-y-4'
 						onSubmit={(event) => {
@@ -177,7 +193,7 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 
 						<div className='space-y-2'>
 							<Label htmlFor='card-title'>Título</Label>
-							<Input id='card-title' value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required autoFocus={!card} />
+							<Input ref={titleInput} id='card-title' value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} required autoFocus={!card} />
 						</div>
 
 						<div className='space-y-2'>
@@ -259,7 +275,9 @@ export default function CardDialog({ target, projects, onClose, onSaved, onDelet
 								Excluir
 							</Button>
 						) : (
-							<span />
+							<p className='hidden self-center text-xs text-muted-foreground sm:block'>
+								<kbd className='rounded border bg-muted px-1 font-sans'>Ctrl/⌘ + Enter</kbd> salva e abre o próximo
+							</p>
 						)}
 						<div className='flex gap-2'>
 							<Button type='button' variant='outline' onClick={onClose} disabled={busy}>
